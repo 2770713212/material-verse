@@ -1,0 +1,2779 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f7f4ed" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='6' fill='%232c2c28'/%3E%3Cpath fill='%23f3ad53' d='M5 27 16 9h5L10 27zm10 0L26 9h5L20 27zm10 0 7-12 4 7-3 5z'/%3E%3C/svg%3E"
+    />
+    <title>Material-Verse：极限材料物理滚珠</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        --paper: #f6f3ec;
+        --ink: #282923;
+        --muted: #716f63;
+        --rule: #d4cfc1;
+        --amber: #f0ae50;
+        --mono: Consolas, "Courier New", monospace;
+        --sans: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+        color: var(--ink);
+        font-family: var(--sans);
+      }
+      * {
+        box-sizing: border-box;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: var(--paper);
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
+        border: 0;
+        background: none;
+      }
+      button:focus-visible {
+        outline: 3px solid #a34b23;
+        outline-offset: 2px;
+      }
+      button:hover {
+        filter: brightness(0.93);
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+      svg {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        display: block;
+      }
+      .defs {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+      }
+      header {
+        height: 62px;
+        flex: none;
+        padding: 0 clamp(16px, 2.5vw, 42px);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        border-bottom: 1px solid var(--rule);
+        z-index: 2;
+      }
+      .logo {
+        width: 35px;
+        height: 35px;
+        background: var(--ink);
+        color: var(--amber);
+        display: grid;
+        place-items: center;
+        border-radius: 5px;
+      }
+      .logo svg {
+        width: 29px;
+        height: 29px;
+        stroke: none;
+        fill: currentColor;
+      }
+      .brand {
+        font:
+          700 24px/1 Georgia,
+          serif;
+        letter-spacing: -1.1px;
+      }
+      .subtitle {
+        border-left: 1px solid var(--rule);
+        padding-left: 16px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 2px;
+      }
+      .tools {
+        margin-left: auto;
+        display: flex;
+        gap: 7px;
+      }
+      .tools button {
+        border: 1px solid var(--rule);
+        border-radius: 5px;
+        height: 32px;
+        min-width: 33px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        background: #faf8f1;
+        font-size: 12px;
+        padding: 0 8px;
+      }
+      .tools svg {
+        width: 15px;
+      }
+      main {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+        background: #e5c9aa;
+      }
+      #view {
+        display: block;
+        width: 100%;
+        height: 100%;
+        outline: 0;
+        cursor: grab;
+      }
+      #view:active {
+        cursor: grabbing;
+      }
+      .stage {
+        position: absolute;
+        left: clamp(18px, 2.7vw, 44px);
+        top: clamp(19px, 3.2vh, 36px);
+        pointer-events: none;
+        color: #302c25;
+      }
+      .eyebrow {
+        font: 700 10px var(--mono);
+        letter-spacing: 1.8px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .eyebrow::before {
+        content: "";
+        width: 23px;
+        height: 3px;
+        background: #a45b36;
+      }
+      .stage h1 {
+        font-family: Georgia, "Songti SC", "SimSun", serif;
+        font-size: clamp(28px, 3vw, 47px);
+        letter-spacing: 2px;
+        margin: 7px 0 6px;
+        line-height: 1.2;
+      }
+      .stage p {
+        margin: 0;
+        font-size: 13px;
+        color: #534b3e;
+        font-weight: 550;
+      }
+      .status {
+        margin-top: 12px;
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .status i {
+        border: 2px solid #61745e;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #c6d0ac;
+      }
+      .course {
+        position: absolute;
+        right: clamp(18px, 2.7vw, 44px);
+        top: clamp(19px, 3.2vh, 36px);
+        width: 158px;
+        padding: 12px 14px;
+        background: #f8f4e9ed;
+        border: 1px solid #bdb29c;
+        border-radius: 4px;
+        pointer-events: none;
+      }
+      .cap {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font: 700 10px var(--mono);
+        letter-spacing: 1.3px;
+      }
+      .cap strong {
+        font-size: 11px;
+        letter-spacing: 0;
+      }
+      .course canvas {
+        width: 100%;
+        height: 46px;
+        display: block;
+        margin: 4px 0;
+      }
+      .dist {
+        border-top: 1px solid var(--rule);
+        padding-top: 6px;
+        font: 10px var(--mono);
+        color: #5d5d53;
+      }
+      .dist span {
+        float: right;
+      }
+      .scene-tag {
+        position: absolute;
+        left: clamp(18px, 2.7vw, 44px);
+        bottom: 17px;
+        background: #2c302beb;
+        color: #fff8e7;
+        border-left: 3px solid var(--amber);
+        padding: 7px 11px;
+        font-size: 12px;
+        font-weight: 550;
+        pointer-events: none;
+      }
+      .scene-tag b {
+        font: 700 10px var(--mono);
+        color: #edb873;
+        margin-right: 9px;
+      }
+      .pad {
+        position: absolute;
+        display: none;
+        width: 106px;
+        height: 106px;
+        border: 1px solid #f9f4d9aa;
+        border-radius: 50%;
+        background: #26292188;
+        bottom: max(18px, env(safe-area-inset-bottom));
+        left: max(18px, env(safe-area-inset-left));
+        box-shadow: inset 0 0 0 6px #e3dfce1c;
+      }
+      .pad:before,
+      .pad:after {
+        content: "";
+        position: absolute;
+        background: #f8efd44a;
+        left: 16%;
+        width: 68%;
+        top: 50%;
+        height: 1px;
+      }
+      .pad:after {
+        transform: rotate(90deg);
+      }
+      .nub {
+        position: absolute;
+        z-index: 1;
+        left: 50%;
+        top: 50%;
+        width: 45px;
+        height: 45px;
+        border: 1px solid #ebe8d3;
+        border-radius: 50%;
+        background: #f0e6cdd9;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 2px 5px #322b2344;
+      }
+      .dock {
+        display: flex;
+        align-items: center;
+        gap: clamp(15px, 2.6vw, 40px);
+        padding: 17px clamp(16px, 2.7vw, 44px);
+        border-top: 1px solid #b5af9d;
+        background: var(--paper);
+        flex: none;
+        z-index: 1;
+      }
+      .readout {
+        min-width: 111px;
+      }
+      .label {
+        font: 700 10px var(--mono);
+        letter-spacing: 1.6px;
+        color: var(--muted);
+      }
+      .velocity {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+      }
+      .velocity b {
+        font: 700 34px/0.98 var(--mono);
+        letter-spacing: -3px;
+      }
+      .velocity small {
+        font: 12px var(--mono);
+        color: var(--muted);
+      }
+      .ticks {
+        height: 4px;
+        margin-top: 6px;
+        width: 96px;
+        background: repeating-linear-gradient(
+          to right,
+          #c6bda9 0 5px,
+          transparent 5px 8px
+        );
+      }
+      .ticks i {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: repeating-linear-gradient(
+          to right,
+          #a45b36 0 5px,
+          transparent 5px 8px
+        );
+      }
+      .selector {
+        border-left: 1px solid var(--rule);
+        padding-left: clamp(14px, 2.3vw, 36px);
+        flex: 1;
+      }
+      .selector .label {
+        margin-bottom: 7px;
+      }
+      .choices {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        max-width: 790px;
+      }
+      .mat {
+        position: relative;
+        border: 1px solid var(--rule);
+        border-radius: 5px;
+        background: #faf8f2;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-align: left;
+        min-height: 49px;
+        padding: 6px 10px;
+      }
+      .mat[aria-pressed="true"] {
+        color: #fff7e6;
+        background: #33352d;
+        border-color: #33352d;
+      }
+      .mat[aria-pressed="true"] .copy small {
+        color: #dacdb4;
+      }
+      .mat[aria-pressed="true"] kbd {
+        background: var(--amber);
+        color: #332d21;
+        border-color: var(--amber);
+      }
+      kbd {
+        background: #e9e5da;
+        border: 1px solid #c9c3b5;
+        border-radius: 3px;
+        padding: 1px 4px;
+        font: 11px var(--mono);
+        color: #575549;
+      }
+      .specimen {
+        width: 29px;
+        height: 29px;
+        flex: none;
+        border-radius: 50%;
+        box-shadow:
+          inset -2px -2px 3px #18181055,
+          0 2px 2px #322b231c;
+      }
+      .steel {
+        background:
+          radial-gradient(circle at 33% 19%, white 1%, transparent 25%),
+          linear-gradient(
+            163deg,
+            #929e9b 0%,
+            #e4e4d6 40%,
+            #53554d 45%,
+            #33362e 59%,
+            #afad98 83%,
+            #555950
+          );
+      }
+      .carbon {
+        background:
+          radial-gradient(circle at 31% 23%, #9caca57a, transparent 48%),
+          repeating-linear-gradient(48deg, #222a28 0 2px, #47514a 2px 3px);
+      }
+      .rubber {
+        background: radial-gradient(
+          circle at 32% 24%,
+          #f6bc89,
+          #ce7356 49%,
+          #874836 90%
+        );
+      }
+      .copy b,
+      .copy small {
+        display: block;
+        white-space: nowrap;
+      }
+      .copy b {
+        font-size: 14px;
+        letter-spacing: 0.5px;
+      }
+      .copy small {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .mat kbd {
+        margin-left: auto;
+      }
+      .mobile-name {
+        display: none;
+      }
+      .reset {
+        min-height: 44px;
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        font-size: 13px;
+      }
+      .reset svg {
+        width: 15px;
+      }
+      footer {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        padding: 7px clamp(16px, 2.7vw, 44px);
+        border-top: 1px solid var(--rule);
+        font-size: 10px;
+        color: #67675c;
+      }
+      footer b {
+        font: 600 10px var(--mono);
+        color: #4c4e42;
+        margin-right: 4px;
+      }
+      footer .revs {
+        margin-left: auto;
+        font: 10px var(--mono);
+        letter-spacing: 1px;
+      }
+      .dialog {
+        position: absolute;
+        inset: 0;
+        background: #28281f5e;
+        display: grid;
+        place-items: center;
+        z-index: 5;
+        padding: 15px;
+      }
+      .dialog[hidden] {
+        display: none;
+      }
+      .sheet {
+        max-width: 420px;
+        background: var(--paper);
+        border: 1px solid #8b816e;
+        border-radius: 7px;
+        padding: 24px;
+        box-shadow: 0 8px 32px #28271d33;
+      }
+      .sheet h2 {
+        font:
+          700 28px Georgia,
+          "SimSun",
+          serif;
+        margin: 8px 0;
+      }
+      .sheet p {
+        font-size: 14px;
+        line-height: 1.7;
+        margin: 9px 0 18px;
+        white-space: pre-line;
+      }
+      .sheet button {
+        background: var(--ink);
+        color: white;
+        border-radius: 4px;
+        padding: 10px 20px;
+        font-weight: 600;
+      }
+      @media (pointer: coarse), (hover: none) {
+        .pad {
+          display: block;
+        }
+        .scene-tag {
+          left: auto;
+          right: 16px;
+          bottom: 16px;
+        }
+        .tools button {
+          min-width: 42px;
+          min-height: 40px;
+        }
+        footer {
+          display: none;
+        }
+      }
+      @media (max-width: 900px) {
+        .dock {
+          gap: 14px;
+          padding: 12px 16px;
+        }
+        .mat {
+          gap: 7px;
+        }
+        .selector {
+          padding-left: 14px;
+        }
+        .reset kbd {
+          display: none;
+        }
+        .readout {
+          min-width: 82px;
+        }
+        .ticks {
+          width: 75px;
+        }
+        footer {
+          gap: 14px;
+        }
+      }
+      @media (max-width: 650px) {
+        header {
+          height: 51px;
+          padding: 0 12px;
+          gap: 8px;
+        }
+        .brand {
+          font-size: 21px;
+        }
+        .logo {
+          width: 29px;
+          height: 29px;
+        }
+        .logo svg {
+          width: 25px;
+        }
+        .subtitle {
+          display: none;
+        }
+        .tools {
+          gap: 4px;
+        }
+        .tools button {
+          min-width: 32px;
+          padding: 0 6px;
+        }
+        .tools .quality svg {
+          display: none;
+        }
+        .stage {
+          left: 14px;
+          top: 15px;
+        }
+        .stage h1 {
+          font-size: 27px;
+          margin: 5px 0;
+        }
+        .stage p {
+          font-size: 11px;
+          max-width: 215px;
+        }
+        .eyebrow {
+          font-size: 9px;
+          letter-spacing: 1px;
+        }
+        .eyebrow::before {
+          width: 14px;
+        }
+        .status {
+          margin-top: 7px;
+          font-size: 10px;
+        }
+        .course {
+          top: 15px;
+          right: 12px;
+          width: 103px;
+          padding: 6px 8px;
+        }
+        .course canvas {
+          height: 29px;
+        }
+        .cap {
+          font-size: 8px;
+          letter-spacing: 0.7px;
+        }
+        .cap strong,
+        .dist {
+          font-size: 9px;
+        }
+        .scene-tag {
+          font-size: 10px;
+          max-width: 54%;
+          bottom: 22px;
+        }
+        .scene-tag b {
+          display: none;
+        }
+        .dock {
+          padding: 9px 10px max(10px, env(safe-area-inset-bottom));
+          gap: 7px;
+        }
+        .readout {
+          min-width: 49px;
+        }
+        .readout .label,
+        .selector .label {
+          font-size: 8px;
+          letter-spacing: 0.8px;
+        }
+        .velocity b {
+          font-size: 23px;
+          letter-spacing: -2px;
+        }
+        .velocity small {
+          font-size: 9px;
+        }
+        .velocity {
+          gap: 3px;
+        }
+        .ticks {
+          width: 45px;
+        }
+        .selector {
+          padding-left: 7px;
+        }
+        .selector .label {
+          margin-bottom: 4px;
+        }
+        .choices {
+          gap: 4px;
+        }
+        .mat {
+          min-height: 46px;
+          padding: 4px 2px;
+          justify-content: center;
+          gap: 3px;
+        }
+        .specimen {
+          width: 16px;
+          height: 16px;
+        }
+        .copy,
+        .mat kbd {
+          display: none;
+        }
+        .mobile-name {
+          display: block;
+          font-size: 11px;
+          font-weight: 650;
+        }
+        .reset {
+          padding: 4px;
+          display: grid;
+          justify-items: center;
+          gap: 1px;
+          font-size: 10px;
+        }
+        .reset svg {
+          width: 16px;
+        }
+        .pad {
+          width: 96px;
+          height: 96px;
+        }
+        footer {
+          display: none;
+        }
+      }
+      @media (max-height: 540px) and (orientation: landscape) {
+        header {
+          height: 39px;
+          padding: 0 max(14px, env(safe-area-inset-left));
+          gap: 9px;
+        }
+        .brand {
+          font-size: 20px;
+        }
+        .logo {
+          width: 26px;
+          height: 26px;
+        }
+        .logo svg {
+          width: 23px;
+        }
+        .tools button {
+          min-height: 32px;
+          height: 32px;
+        }
+        .stage {
+          top: 10px;
+          left: max(16px, env(safe-area-inset-left));
+        }
+        .stage h1 {
+          font-size: 23px;
+          margin: 3px 0;
+        }
+        .stage p,
+        .status {
+          font-size: 10px;
+        }
+        .status {
+          margin-top: 3px;
+        }
+        .course {
+          top: 9px;
+          right: 14px;
+          width: 118px;
+          padding: 5px 8px;
+        }
+        .course canvas {
+          height: 22px;
+        }
+        .dock {
+          padding: 5px max(12px, env(safe-area-inset-right));
+          gap: 13px;
+        }
+        .selector .label {
+          display: none;
+        }
+        .mat {
+          min-height: 44px;
+        }
+        .readout {
+          min-width: 72px;
+        }
+        .velocity b {
+          font-size: 23px;
+        }
+        .ticks {
+          display: none;
+        }
+        .pad {
+          width: 80px;
+          height: 80px;
+          bottom: 10px;
+        }
+        .nub {
+          width: 35px;
+          height: 35px;
+        }
+        .scene-tag {
+          bottom: 9px;
+        }
+        .sheet {
+          padding: 14px 20px;
+        }
+        .sheet p {
+          font-size: 12px;
+          line-height: 1.4;
+          margin: 6px 0;
+        }
+        .sheet h2 {
+          font-size: 23px;
+        }
+        footer {
+          display: none;
+        }
+      }
+
+      .stage {
+        background: rgba(247, 242, 230, 0.94);
+        border: 1px solid #c9bfa8;
+        border-top: 2px solid #a26642;
+        padding: 13px 17px 12px;
+        border-radius: 2px;
+      }
+      .choices {
+        max-width: none;
+      }
+      .scene-tag,
+      .status {
+        letter-spacing: 0.3px;
+      }
+      @media (max-width: 650px) {
+        .stage {
+          padding: 8px 9px;
+          max-width: calc(100% - 135px);
+        }
+        .stage h1 {
+          margin: 4px 0;
+        }
+        .stage p {
+          max-width: 100%;
+          line-height: 1.45;
+        }
+      }
+      @media (max-height: 540px) and (orientation: landscape) {
+        .stage {
+          padding: 6px 10px;
+        }
+        .stage .status {
+          margin-top: 2px;
+        }
+      }
+      @media (max-width: 650px) {
+        .reset {
+          min-width: 44px;
+        }
+        .tools button {
+          min-height: 40px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg class="defs" aria-hidden="true">
+      <defs>
+        <symbol id="mark" viewBox="0 0 40 40">
+          <path d="M4 29 16 9h6L10 29zm10 0L26 9h6L20 29zm11 0 8-13 4 7-4 6z" />
+        </symbol>
+        <symbol id="sliders" viewBox="0 0 24 24">
+          <path d="M3 7h7m4 0h7M3 17h11m4 0h3" />
+          <circle cx="12" cy="7" r="2" />
+          <circle cx="16" cy="17" r="2" />
+        </symbol>
+        <symbol id="sound" viewBox="0 0 24 24">
+          <path d="M3 9h4l5-4v14l-5-4H3zm13-1q4 4 0 8m3-11q7 7 0 14" />
+        </symbol>
+        <symbol id="mute" viewBox="0 0 24 24">
+          <path d="M3 9h4l5-4v14l-5-4H3zm13 0 6 6m0-6-6 6" />
+        </symbol>
+        <symbol id="help" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9.5 9a2.6 2.6 0 0 1 5 .5c0 2-2.5 2.2-2.5 4m0 2.5v.1" />
+        </symbol>
+        <symbol id="restart" viewBox="0 0 24 24">
+          <path d="M4 5v6h6M5 10a7 7 0 1 1 1 7" />
+        </symbol>
+      </defs>
+    </svg>
+    <header>
+      <div class="logo">
+        <svg><use href="#mark" /></svg>
+      </div>
+      <span class="brand">Material-Verse</span
+      ><span class="subtitle">极限材料物理滚珠</span>
+      <div class="tools">
+        <button id="quality" class="quality">
+          <svg><use href="#sliders" /></svg><span>画质 · 高</span></button
+        ><button id="audio" aria-label="静音" title="声音">
+          <svg><use href="#sound" /></svg></button
+        ><button
+          id="helpBtn"
+          aria-label="操作与材料手册"
+          title="操作与材料手册"
+        >
+          <svg><use href="#help" /></svg>
+        </button>
+      </div>
+    </header>
+    <main>
+      <canvas id="view" aria-label="三维峡谷赛道"></canvas>
+      <div class="stage">
+        <div class="eyebrow" id="stageNo">FIELD TRIAL &nbsp; 01 / 03</div>
+        <h1 id="stageName">风蚀峡谷</h1>
+        <p id="mission">沿青色涂层加速，换钢球接通跳板。</p>
+        <div class="status">
+          <i></i><span id="state" role="status">正在装载试验场</span>
+        </div>
+      </div>
+      <aside class="course">
+        <div class="cap">ROUTE <strong id="pct">0%</strong></div>
+        <canvas
+          id="map"
+          width="284"
+          height="88"
+          aria-label="当前赛道进度"
+        ></canvas>
+        <div class="dist">
+          <b id="distance">000</b> m <span id="total">/ 000</span>
+        </div>
+      </aside>
+      <div class="scene-tag">
+        <b id="surfaceCode">TRACK / 00</b><span id="surfaceName">起点平台</span>
+      </div>
+      <div id="pad" class="pad" aria-label="移动摇杆">
+        <div class="nub"></div>
+      </div>
+      <div class="dialog" id="dialog" hidden>
+        <div
+          class="sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="dialogTitle"
+        >
+          <div id="dialogKicker" class="label">FIELD MANUAL</div>
+          <h2 id="dialogTitle"></h2>
+          <p id="dialogText"></p>
+          <button id="dialogAction">继续试验</button>
+        </div>
+      </div>
+    </main>
+    <section class="dock">
+      <div class="readout">
+        <div class="label">速度 / VEL</div>
+        <div class="velocity"><b id="speed">0.0</b><small>m/s</small></div>
+        <div class="ticks"><i id="meter"></i></div>
+      </div>
+      <div class="selector">
+        <div class="label">材料选择 &nbsp;/&nbsp; MATERIAL</div>
+        <div class="choices" role="group" aria-label="滚珠材料">
+          <button class="mat" data-m="0" aria-pressed="true">
+            <i class="specimen steel"></i
+            ><span class="copy"
+              ><b>轴承钢球</b><small>高密度 · 电路导通</small></span
+            ><span class="mobile-name">1 钢球</span><kbd>1</kbd>
+          </button>
+          <button class="mat" data-m="1" aria-pressed="false">
+            <i class="specimen carbon"></i
+            ><span class="copy"
+              ><b>碳纤维复合球</b><small>轻量化 · 快速转向</small></span
+            ><span class="mobile-name">2 碳纤</span><kbd>2</kbd>
+          </button>
+          <button class="mat" data-m="2" aria-pressed="false">
+            <i class="specimen rubber"></i
+            ><span class="copy"
+              ><b>硅橡胶弹力球</b><small>高回弹 · 连续跳跃</small></span
+            ><span class="mobile-name">3 硅胶</span><kbd>3</kbd>
+          </button>
+        </div>
+      </div>
+      <button class="reset" id="reset">
+        <svg><use href="#restart" /></svg>重置 <kbd>R</kbd>
+      </button>
+    </section>
+    <footer>
+      <span><b>W A S D / ↑ ↓ ← →</b> 移动</span
+      ><span><b>1 / 2 / 3</b> 切换材质</span><span><b>拖拽</b> 调整视角</span
+      ><span><b>滚轮</b> 缩放</span
+      ><span class="revs">MV &nbsp;/&nbsp; MATERIAL DYNAMICS LAB</span>
+    </footer>
+    <script type="module">
+      const $ = (id) => document.getElementById(id);
+      try {
+        const [T, C] = await Promise.all([
+          import("three"),
+          import("cannon-es"),
+        ]);
+
+        // Course distances use metres. Forward travel corresponds to negative world Z.
+        const LEVELS = [
+          {
+            name: "风蚀峡谷",
+            mission: "沿青色涂层加速，换钢球接通跳板。",
+            wind: 0.6,
+            threshold: 9,
+            sections: [
+              ["start", -10, 11, 0, 0, 10],
+              ["hydro", 11, 32, 0, 0, 10],
+              ["alloy", 32, 42, 0, 0, 10],
+              ["landing", 52, 84, 2.4, 0, 11],
+            ],
+          },
+          {
+            name: "白潮河床",
+            mission: "用碳纤球加速，以至少 11 m/s 掠过流体池。",
+            wind: 2.2,
+            threshold: 11,
+            sections: [
+              ["start", -10, 10, 0, 0, 10],
+              ["hydro", 10, 28, 0, 0, 9],
+              ["fluid", 28, 46, 0, 0.6, 8.8],
+              ["road", 46, 58, 0, 0.8, 9],
+              ["alloy", 58, 68, 0, 0.8, 9],
+              ["landing", 79, 105, 3, 0, 10],
+            ],
+          },
+          {
+            name: "断层回廊",
+            mission: "高速过池，钢球弹射后切硅胶，连续反弹过断层。",
+            wind: 2.9,
+            threshold: 13,
+            sections: [
+              ["start", -10, 9, 0.9, 0, 10],
+              ["hydro", 9, 25, 0.9, 0, 9],
+              ["fluid", 29, 44, 0, -0.5, 9],
+              ["road", 44, 49, 0, -0.6, 9],
+              ["alloy", 49, 59, 0, -0.6, 9],
+              ["bounce", 71, 87, 1, -0.4, 10],
+              ["bounce", 97, 114, 1, 0.4, 10],
+              ["landing", 123, 160, 0.8, 0.3, 10],
+            ],
+          },
+        ];
+        const MATERIALS = [
+          {
+            name: "轴承钢球",
+            mass: 7.8,
+            drive: 12,
+            steer: 13,
+            cap: 21,
+            bounce: 0.1,
+            tint: 0xeac486,
+          },
+          {
+            name: "碳纤维复合球",
+            mass: 1.45,
+            drive: 24,
+            steer: 30,
+            cap: 26,
+            bounce: 0.13,
+            tint: 0x82c8bc,
+          },
+          {
+            name: "硅橡胶弹力球",
+            mass: 1.9,
+            drive: 16,
+            steer: 20,
+            cap: 21,
+            bounce: 0.89,
+            tint: 0xef997c,
+          },
+        ];
+        const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+        let seed = 726154;
+        function random() {
+          seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+          return seed / 4294967296;
+        }
+        function texture(w, h, paint) {
+          const c = document.createElement("canvas");
+          c.width = w;
+          c.height = h;
+          paint(c.getContext("2d"), w, h);
+          const t = new T.CanvasTexture(c);
+          t.colorSpace = T.SRGBColorSpace;
+          t.anisotropy = 4;
+          return t;
+        }
+        const renderer = new T.WebGLRenderer({
+          canvas: $("view"),
+          antialias: true,
+          powerPreference: "high-performance",
+        });
+        renderer.outputColorSpace = T.SRGBColorSpace;
+        renderer.toneMapping = T.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
+        renderer.shadowMap.type = T.PCFSoftShadowMap;
+        const scene = new T.Scene(),
+          camera = new T.PerspectiveCamera(46, 1, 0.12, 360);
+        scene.background = new T.Color(0xf0d9b7);
+        scene.fog = new T.FogExp2(0xe7caaa, 0.0088);
+        scene.add(new T.HemisphereLight(0xfff4d7, 0xb69a80, 1.65));
+        const sun = new T.DirectionalLight(0xffeddb, 2.12);
+        sun.castShadow = true;
+        sun.shadow.mapSize.set(1024, 1024);
+        Object.assign(sun.shadow.camera, {
+          left: -21,
+          right: 21,
+          top: 24,
+          bottom: -22,
+          near: 1,
+          far: 95,
+        });
+        sun.shadow.bias = -0.00035;
+        sun.shadow.normalBias = 0.035;
+        scene.add(sun, sun.target);
+        const sky = new T.Mesh(
+          new T.SphereGeometry(320, 36, 18),
+          new T.ShaderMaterial({
+            side: T.BackSide,
+            depthWrite: false,
+            uniforms: {},
+            vertexShader:
+              "varying vec3 vDir;void main(){vDir=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
+            fragmentShader: `varying vec3 vDir;void main(){vec3 d=normalize(vDir);float h=smoothstep(-.015,.34,d.y);vec3 col=mix(vec3(.92,.80,.66),vec3(.51,.70,.77),h);float sun=dot(d,normalize(vec3(-.55,.21,-1.)));col=mix(col,vec3(1.,.94,.77),smoothstep(.9982,.9988,sun)*.95);gl_FragColor=vec4(col,1.);}`,
+          }),
+        );
+        scene.add(sky);
+        const refl = texture(512, 256, (g, w, h) => {
+          let a = g.createLinearGradient(0, 0, 0, h);
+          [
+            [0, "#758b9a"],
+            [0.29, "#e9f3ff"],
+            [0.44, "#f3f2e1"],
+            [0.46, "#6c5747"],
+            [0.52, "#343a35"],
+            [0.62, "#595649"],
+            [0.73, "#e2c096"],
+            [1, "#80735b"],
+          ].forEach(([p, c]) => a.addColorStop(p, c));
+          g.fillStyle = a;
+          g.fillRect(0, 0, w, h);
+          g.fillStyle = "#fffcef";
+          g.fillRect(95, 30, 44, 92);
+          g.fillRect(350, 43, 58, 62);
+          g.fillStyle = "#504834";
+          g.fillRect(205, 132, 42, 78);
+        });
+        refl.mapping = T.EquirectangularReflectionMapping;
+        const gen = new T.PMREMGenerator(renderer);
+        const env = gen.fromEquirectangular(refl);
+        scene.environment = env.texture;
+        gen.dispose();
+        refl.dispose();
+        const worldGroup = new T.Group(),
+          courseGroup = new T.Group();
+        scene.add(worldGroup, courseGroup);
+        const geometryCache = { box: new T.BoxGeometry(1, 1, 1) };
+        const standard = (color, roughness = 0.75, metalness = 0) =>
+          new T.MeshStandardMaterial({ color, roughness, metalness });
+        function box(parent, x, y, z, w, h, d, material) {
+          const m = new T.Mesh(geometryCache.box, material);
+          m.position.set(x, y, z);
+          m.scale.set(w, h, d);
+          m.receiveShadow = true;
+          parent.add(m);
+          return m;
+        }
+        const sand = standard(0xcfa67e),
+          pillar = standard(0x7e6753),
+          charcoal = standard(0x333b3a),
+          edge = standard(0x59605a),
+          amber = standard(0xe5a64d),
+          ivory = standard(0xe4d4aa),
+          turq = standard(0x77ad9a),
+          red = standard(0xb66848);
+        box(worldGroup, 0, -14.2, -55, 500, 2, 520, sand);
+        // Each mesa is one faceted mesh. Recessed strata follow the same eroded outline.
+        const terrainChunks = new Map(),
+          rockFace = new T.MeshLambertMaterial({
+            vertexColors: true,
+            flatShading: true,
+            side: T.DoubleSide,
+          });
+        function mesa(x, z, rx, rz, height, far = false) {
+          const n = 10 + Math.floor(random() * 5),
+            angles = [],
+            profile = [];
+          for (let i = 0; i < n; i++) {
+            angles.push(((i + random() * 0.38) * Math.PI * 2) / n);
+            profile.push(0.84 + random() * 0.25);
+          }
+          const bands = [
+            [-0.04, 1.18],
+            [0.17, 1.06],
+            [0.25, 0.92],
+            [0.29, 0.98],
+            [0.32, 0.88],
+            [0.63, 0.85],
+            [0.68, 0.79],
+            [0.72, 0.82],
+            [0.76, 0.74],
+            [0.94, 0.72],
+            [1, 0.64],
+          ];
+          const palette = far
+            ? [
+                0xbd967b, 0xc8a38a, 0xc49b81, 0xd1ad90, 0xbe947c, 0xcaa486,
+                0xbd937e, 0xd8b490, 0xc5a185, 0xdaba97,
+              ]
+            : [
+                0xb17a59, 0xc58f69, 0xa16f53, 0xd2a17a, 0xb67d60, 0xca9573,
+                0xa7755a, 0xd5a881, 0xbd8b69, 0xe4b68a,
+              ];
+          const positions = [],
+            colors = [],
+            rows = bands.map(([v, r]) =>
+              angles.map((a, i) => [
+                x + Math.cos(a) * rx * r * profile[i] + v * rx * 0.12,
+                -13 + height * (v + Math.sin(a * 3) * 0.018),
+                z + Math.sin(a) * rz * r * profile[i],
+              ]),
+            );
+          function tri(a, b, c, col) {
+            positions.push(...a, ...b, ...c);
+            for (let j = 0; j < 3; j++) colors.push(col.r, col.g, col.b);
+          }
+          for (let k = 0; k < rows.length - 1; k++)
+            for (let i = 0; i < n; i++) {
+              let j = (i + 1) % n,
+                col = new T.Color(palette[k]).multiplyScalar(
+                  0.91 + 0.12 * random(),
+                );
+              tri(rows[k][i], rows[k + 1][i], rows[k][j], col);
+              tri(rows[k][j], rows[k + 1][i], rows[k + 1][j], col);
+            }
+          for (let i = 0; i < n; i++)
+            tri(
+              rows.at(-1)[(i + 1) % n],
+              rows.at(-1)[i],
+              [x, -13 + height, z],
+              new T.Color(0xd7aa80),
+            );
+          const chunkKey = Math.floor(z / 34) + ":" + Math.sign(x);
+          if (!terrainChunks.has(chunkKey))
+            terrainChunks.set(chunkKey, { positions: [], colors: [] });
+          const chunk = terrainChunks.get(chunkKey);
+          chunk.positions.push(...positions);
+          chunk.colors.push(...colors);
+        }
+        for (let side of [-1, 1]) {
+          for (let i = 0; i < 18; i++) {
+            const z = 30 - i * 12 + random() * 9;
+            mesa(
+              side * (25 + random() * 36),
+              z,
+              5 + random() * 10,
+              6 + random() * 10,
+              10 + random() * 16,
+            );
+          }
+          for (let i = 0; i < 19; i++)
+            mesa(
+              side * (64 + random() * 59),
+              42 - i * 14,
+              13 + random() * 18,
+              10 + random() * 17,
+              22 + random() * 25,
+              true,
+            );
+        }
+        for (let i = 0; i < 13; i++)
+          mesa(
+            -115 + i * 19,
+            -184 - random() * 25,
+            14 + random() * 11,
+            12 + random() * 10,
+            22 + random() * 25,
+            true,
+          );
+        for (const { positions, colors } of terrainChunks.values()) {
+          const geo = new T.BufferGeometry();
+          geo.setAttribute(
+            "position",
+            new T.Float32BufferAttribute(positions, 3),
+          );
+          geo.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
+          geo.computeVertexNormals();
+          worldGroup.add(new T.Mesh(geo, rockFace));
+        }
+        terrainChunks.clear();
+        const rocks = new T.InstancedMesh(
+            new T.DodecahedronGeometry(1, 0),
+            standard(0xba8e6b),
+            330,
+          ),
+          dummy = new T.Object3D();
+        for (let i = 0; i < 330; i++) {
+          dummy.position.set(
+            (random() - 0.5) * 180,
+            -13 + random() * 0.65,
+            48 - random() * 235,
+          );
+          dummy.scale.set(
+            1 + random() * 2,
+            0.25 + random() * 1.3,
+            0.7 + random() * 1.7,
+          );
+          dummy.rotation.y = random() * 6;
+          dummy.updateMatrix();
+          rocks.setMatrixAt(i, dummy.matrix);
+        }
+        worldGroup.add(rocks);
+        const roadTex = texture(256, 256, (g, w, h) => {
+          g.fillStyle = "#535953";
+          g.fillRect(0, 0, w, h);
+          for (let i = 0; i < 12000; i++) {
+            g.fillStyle =
+              random() > 0.5 ? "rgba(240,231,201,.10)" : "rgba(20,25,23,.12)";
+            g.fillRect(random() * w, random() * h, 1.5, 2);
+          }
+          g.fillStyle = "#414941";
+          g.fillRect(0, 0, w, 2);
+          g.fillStyle = "#7d8070";
+          g.fillRect(0, 2, w, 1);
+        });
+        roadTex.wrapS = roadTex.wrapT = T.RepeatWrapping;
+        const roadMat = standard(0xd2d0bd);
+        roadMat.map = roadTex;
+        const shaderVertex = `varying vec2 vUv;varying vec3 vPos;void main(){vUv=uv;vPos=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(vPos,1.);}`;
+        function surfaceMat(body, alpha = false) {
+          return new T.ShaderMaterial({
+            transparent: alpha,
+            depthWrite: !alpha,
+            uniforms: {
+              clock: { value: 0 },
+              heat: { value: 0 },
+              hard: { value: 0 },
+              ball: { value: new T.Vector2() },
+            },
+            vertexShader: shaderVertex,
+            fragmentShader:
+              `varying vec2 vUv;varying vec3 vPos;uniform float clock,heat,hard;uniform vec2 ball;
+ float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+ void main(){vec2 p=vPos.xz;` +
+              body +
+              `
+ float fog=1.-exp(-.00007*pow(distance(cameraPosition,vPos),2.));gl_FragColor.rgb=mix(gl_FragColor.rgb,vec3(.90,.80,.68),fog);}`,
+          });
+        }
+        const hydroMat = surfaceMat(
+          `vec2 u=p*5.;vec2 id=floor(u);vec2 q=fract(u)-(.28+.43*vec2(hash(id),hash(id+6.)));float r=length(q);float a=hash(id+2.);float bead=(1.-smoothstep(.045,.14,r))*step(.73,a);float veins=smoothstep(.84,.99,cos((p.x*.94+abs(fract(p.y*.29)-.5))*20.));float laser=smoothstep(.86,1.,sin(27.*p.x+4.*sin(p.y*1.1)));vec3 c=mix(vec3(.17,.37,.34),vec3(.38,.64,.54),.4+.25*sin(p.y*.6+p.x*.65));c+=vec3(.08,.13,.10)*veins+laser*.028;c+=bead*(.24+.49*(1.-smoothstep(.01,.10,length(q+vec2(.033)))));gl_FragColor=vec4(c,1.);`,
+        );
+        const alloyMat = surfaceMat(
+          `float brush=hash(vec2(floor(p.x*48.),floor(p.y*2.)))*.065;float seam=smoothstep(.89,.99,cos(p.y*3.5));float band=.5+.5*sin(p.y*1.15-clock*9.);vec3 cold=mix(vec3(.32,.27,.23),vec3(.52,.42,.33),vUv.x);vec3 hot=mix(vec3(.63,.16,.045),vec3(1.,.68,.20),band*.38+.62*heat);vec3 c=mix(cold,hot,clamp(heat*1.35,0.,1.))+brush-seam*.09;gl_FragColor=vec4(c,1.);`,
+        );
+        const fluidMat = surfaceMat(
+          `float dist=length(p-ball);float ripple=sin(dist*6.-clock*6.)*exp(-dist*.45);float wave=sin(p.x*2.+p.y*.7+clock)*.37+sin(p.y*2.2+clock*1.5)*.3+ripple;float crest=smoothstep(.42,.67,wave);vec3 milk=mix(vec3(.72,.78,.73),vec3(.96,.95,.84),.54+wave*.29);milk+=.12*crest;float ring=exp(-dist*.68)*(.5+.5*cos(dist*10.));milk=mix(milk,vec3(.53,.75,.68),hard*ring*.6);gl_FragColor=vec4(milk,.85+.13*hard);`,
+          true,
+        );
+        const weave = texture(128, 128, (g, w, h) => {
+          g.fillStyle = "#29302e";
+          g.fillRect(0, 0, w, h);
+          for (let y = 0; y < 16; y++)
+            for (let x = 0; x < 16; x++) {
+              const d = (x + y) % 4 < 2;
+              for (let j = 0; j < 4; j++) {
+                g.fillStyle = ["#303735", "#59605a", "#404941", "#292f2b"][j];
+                g.fillRect(
+                  x * 8 + (d ? j * 2 : 0),
+                  y * 8 + (d ? 0 : j * 2),
+                  d ? 1.5 : 8,
+                  d ? 8 : 1.5,
+                );
+              }
+            }
+        });
+        weave.wrapS = weave.wrapT = T.RepeatWrapping;
+        weave.repeat.set(5, 3);
+        const ballMats = [
+          new T.MeshStandardMaterial({
+            color: 0xe2e4dc,
+            metalness: 0.97,
+            roughness: 0.095,
+            envMapIntensity: 1.1,
+          }),
+          new T.MeshStandardMaterial({
+            map: weave,
+            roughness: 0.31,
+            metalness: 0.48,
+          }),
+          new T.MeshPhysicalMaterial({
+            color: 0xd78266,
+            roughness: 0.52,
+            clearcoat: 0.17,
+          }),
+        ];
+        const R = 0.72,
+          ballMesh = new T.Mesh(new T.SphereGeometry(R, 40, 28), ballMats[0]);
+        ballMesh.castShadow = true;
+        scene.add(ballMesh);
+        const shadeTex = texture(96, 96, (g) => {
+          const a = g.createRadialGradient(48, 48, 2, 48, 48, 47);
+          a.addColorStop(0, "rgba(18,21,17,.68)");
+          a.addColorStop(0.45, "rgba(23,22,16,.37)");
+          a.addColorStop(1, "rgba(20,22,19,0)");
+          g.fillStyle = a;
+          g.fillRect(0, 0, 96, 96);
+        });
+        const shadow = new T.Mesh(
+          new T.PlaneGeometry(2.8, 2.8),
+          new T.MeshBasicMaterial({
+            map: shadeTex,
+            transparent: true,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+          }),
+        );
+        shadow.rotation.x = -Math.PI / 2;
+        scene.add(shadow);
+
+        // Course construction and collision bodies share one set of dimensions.
+        const world = new C.World({
+          gravity: new C.Vec3(0, -20, 0),
+          allowSleep: false,
+        });
+        world.solver.iterations = 12;
+        const ballPhys = new C.Material("specimen"),
+          groundPhys = new C.Material("deck");
+        const contact = new C.ContactMaterial(ballPhys, groundPhys, {
+          friction: 0.34,
+          restitution: 0.1,
+          contactEquationStiffness: 1e8,
+          contactEquationRelaxation: 3,
+        });
+        world.addContactMaterial(contact);
+        const wetPhys = new C.Material("low friction"),
+          slickContact = new C.ContactMaterial(ballPhys, wetPhys, {
+            friction: 0.001,
+            restitution: 0.1,
+          });
+        world.addContactMaterial(slickContact);
+        const ball = new C.Body({
+          mass: MATERIALS[0].mass,
+          shape: new C.Sphere(R),
+          material: ballPhys,
+          linearDamping: 0.055,
+          angularDamping: 0.18,
+        });
+        world.addBody(ball);
+        let level = 0,
+          material = 0,
+          sections = [],
+          colliders = [],
+          finish = 0,
+          board = null,
+          lift = 0,
+          temperature = 0,
+          charge = false,
+          cooldown = 0;
+        const tiles = new T.PlaneGeometry(1, 1),
+          courseAssets = [];
+        function printMat(words, bg, fg, size = 64) {
+          const t = texture(768, 128, (g, w, h) => {
+            if (bg) {
+              g.fillStyle = bg;
+              g.fillRect(0, 0, w, h);
+            }
+            g.fillStyle = fg;
+            g.font = "bold " + size + "px Consolas, monospace";
+            g.textAlign = "center";
+            g.textBaseline = "middle";
+            g.fillText(words, w / 2, h * 0.53, w * 0.92);
+          });
+          const mat = new T.MeshBasicMaterial({
+            map: t,
+            transparent: !bg,
+            depthWrite: !!bg,
+            side: T.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+          });
+          courseAssets.push(t, mat);
+          return mat;
+        }
+        function panel(parent, x, y, s, w, h, mat, flat = false) {
+          const m = new T.Mesh(tiles, mat);
+          m.scale.set(w, h, 1);
+          m.position.set(x, y, -s);
+          if (flat) m.rotation.x = -Math.PI / 2;
+          parent.add(m);
+          return m;
+        }
+        const gates = [];
+        function gantry(s, y, w, label) {
+          const gate = new T.Group();
+          courseGroup.add(gate);
+          gate.userData.gateS = s;
+          gates.push(gate);
+          const x = w / 2 + 0.47;
+          for (const side of [-1, 1]) {
+            box(gate, side * x, y + 2.2, -s, 0.4, 4.4, 0.45, charcoal);
+            box(gate, side * x, y + 0.6, -s, 0.53, 1.2, 0.59, amber);
+            box(gate, side * x, y + 0.18, -s, 0.8, 0.35, 0.85, edge);
+          }
+          box(gate, 0, y + 4.55, -s, w + 1.4, 0.69, 0.62, charcoal);
+          box(gate, 0, y + 4.94, -s, w + 1.5, 0.1, 0.66, amber);
+          panel(
+            gate,
+            0,
+            y + 4.56,
+            s - 0.321,
+            6.7,
+            0.52,
+            printMat(label, "#303a36", "#f1e6c9", 70),
+          );
+          for (let j = 0; j < 3; j++)
+            for (let side of [-1, 1]) {
+              const stripe = box(
+                gate,
+                side * (w * 0.41 - j * 0.23),
+                y + 4.55,
+                -s + 0.322,
+                0.1,
+                0.42,
+                0.018,
+                amber,
+              );
+              stripe.rotation.z = -0.37;
+            }
+        }
+        const typeNames = {
+          start: ["00", "起点平台"],
+          road: ["01", "过渡平台"],
+          hydro: ["SH", "超疏水微纳涂层"],
+          alloy: ["NiTi", "形状记忆合金"],
+          fluid: ["STF", "剪切增稠流体"],
+          bounce: ["Si", "回弹落点"],
+          landing: ["END", "终点平台"],
+        };
+        function batching(parent) {
+          parent.updateMatrixWorld(true);
+          const byMat = new Map();
+          for (const m of [...parent.children]) {
+            if (m.geometry !== geometryCache.box) continue;
+            let list = byMat.get(m.material);
+            if (!list) byMat.set(m.material, (list = []));
+            list.push(m);
+          }
+          for (const [mat, list] of byMat) {
+            const batch = new T.InstancedMesh(
+              geometryCache.box,
+              mat,
+              list.length,
+            );
+            list.forEach((m, i) => {
+              batch.setMatrixAt(i, m.matrix);
+              parent.remove(m);
+            });
+            batch.receiveShadow = true;
+            parent.add(batch);
+          }
+        }
+        function buildCourse() {
+          for (const b of colliders) world.removeBody(b);
+          colliders = [];
+          for (const obj of courseGroup.children) {
+            if (obj.isInstancedMesh) obj.dispose();
+          }
+          courseGroup.clear();
+          for (const a of courseAssets) a.dispose();
+          courseAssets.length = 0;
+          gates.length = 0;
+          sections = LEVELS[level].sections.map(([type, a, b, y, x, w]) => ({
+            type,
+            a,
+            b,
+            y,
+            x,
+            w,
+          }));
+          finish = sections.at(-1).b - 3;
+          const arrows = printMat("❯    ❯    ❯", null, "#dcdcc0", 72);
+          for (const [i, k] of sections.entries()) {
+            const { type, a, b, y, x, w } = k,
+              mid = (a + b) / 2,
+              len = b - a,
+              fluid = type === "fluid",
+              alloy = type === "alloy";
+            const phys = new C.Body({
+              mass: 0,
+              material: type === "hydro" ? wetPhys : groundPhys,
+              shape: new C.Box(new C.Vec3(w / 2, 0.54, len / 2)),
+              position: new C.Vec3(x, y - 0.54, -mid),
+            });
+            world.addBody(phys);
+            colliders.push(phys);
+            k.body = phys;
+            const baseColor = fluid ? turq : type === "bounce" ? red : charcoal;
+            box(courseGroup, x, y - 0.66, -mid, w + 0.18, 0.5, len, baseColor);
+            if (!fluid) box(courseGroup, x, y - 0.2, -mid, w, 0.39, len, edge);
+            else box(courseGroup, x, y - 0.4, -mid, w, 0.2, len, turq);
+            let parent = courseGroup,
+              topY = y,
+              topX = x,
+              topS = mid;
+            let skin =
+              type === "hydro"
+                ? hydroMat
+                : alloy
+                  ? alloyMat
+                  : fluid
+                    ? fluidMat
+                    : roadMat;
+            if (skin === roadMat) {
+              const t = roadTex.clone();
+              t.repeat.set(w / 3, len / 4);
+              skin = roadMat.clone();
+              skin.map = t;
+              courseAssets.push(skin, t);
+            }
+            if (alloy) {
+              board = new T.Group();
+              board.position.set(x, y, -a);
+              courseGroup.add(board);
+              parent = board;
+              topX = 0;
+              topY = 0.012;
+              topS = len * 0.5;
+              box(board, 0, -0.08, -topS, w, 0.15, len, charcoal);
+            }
+            const face = panel(
+              parent,
+              topX,
+              topY + 0.012,
+              topS,
+              w,
+              len,
+              skin,
+              true,
+            );
+            face.receiveShadow = true;
+            for (let side of [-1, 1]) {
+              const lineX = x + side * (w / 2 - 0.2);
+              box(
+                courseGroup,
+                lineX,
+                y + 0.026,
+                -mid,
+                0.105,
+                0.025,
+                len - 0.08,
+                type === "hydro" ? turq : amber,
+              );
+              for (let s = a + 0.65; s < b - 0.32; s += 2) {
+                box(
+                  courseGroup,
+                  x + side * (w / 2 - 0.48),
+                  y + 0.045,
+                  -s,
+                  0.25,
+                  0.022,
+                  0.085,
+                  ivory,
+                );
+              }
+              for (let s = a + 1.25; s < b - 0.15; s += 4.0) {
+                box(
+                  courseGroup,
+                  x + side * (w / 2 + 0.04),
+                  y - 0.25,
+                  -s,
+                  0.14,
+                  0.23,
+                  0.8,
+                  amber,
+                );
+              }
+              for (let s = a + 2.2; s < b - 1; s += 10) {
+                box(
+                  courseGroup,
+                  x + side * (w / 2 + 0.23),
+                  y + 0.35,
+                  -s,
+                  0.11,
+                  0.78,
+                  0.13,
+                  charcoal,
+                );
+                box(
+                  courseGroup,
+                  x + side * (w / 2 + 0.23),
+                  y + 0.74,
+                  -s,
+                  0.16,
+                  0.15,
+                  0.17,
+                  ivory,
+                );
+              }
+            }
+            for (let s = a + 2; s < b; s += 8) {
+              box(courseGroup, x, y - 1.02, -s, w + 0.38, 0.28, 0.38, pillar);
+              for (let side of [-1, 1])
+                box(
+                  courseGroup,
+                  x + side * w * 0.34,
+                  (y - 14) / 2,
+                  -s,
+                  0.54,
+                  y + 14,
+                  0.64,
+                  pillar,
+                );
+            }
+            if (type === "start") {
+              gantry(8, y, w, "MV  /  START");
+              panel(
+                courseGroup,
+                x,
+                y + 0.028,
+                -2,
+                w * 0.67,
+                1.6,
+                printMat("START   /   0" + (level + 1), null, "#e0d9bf"),
+                true,
+              );
+              for (let j = 0; j < 16; j++)
+                for (let r = 0; r < 2; r++)
+                  if ((r + j) % 2 === 0)
+                    box(
+                      courseGroup,
+                      x - w * 0.42 + ((j + 0.5) * w * 0.84) / 16,
+                      y + 0.032,
+                      -7.1 - r * 0.32,
+                      (w * 0.84) / 16,
+                      0.016,
+                      0.32,
+                      ivory,
+                    );
+            } else if (type === "landing") {
+              gantry(finish, y, w, "FINISH   /   0" + (level + 1));
+            } else if (type === "hydro") {
+              for (let s = a + 3; s < b; s += 5) {
+                for (let side of [-1, 1]) {
+                  const m = panel(
+                    courseGroup,
+                    x + side * (w * 0.33),
+                    y + 0.034,
+                    s,
+                    1.65,
+                    0.48,
+                    arrows,
+                    true,
+                  );
+                  m.rotateZ(Math.PI / 2);
+                }
+              }
+            }
+            if (alloy) {
+              for (let s = 2; s < len - 1; s += 1.7) {
+                for (let side of [-1, 1])
+                  box(
+                    board,
+                    side * (w * 0.34),
+                    0.042,
+                    -s,
+                    0.58,
+                    0.025,
+                    0.17,
+                    amber,
+                  );
+              }
+            }
+            if (type === "bounce")
+              panel(
+                courseGroup,
+                x,
+                y + 0.03,
+                mid,
+                4.2,
+                0.9,
+                printMat("REBOUND", null, "#f0ad75"),
+                true,
+              );
+            if (type !== "start") {
+              const bx = x - w / 2 - 0.95;
+              box(
+                courseGroup,
+                bx,
+                y + 0.95,
+                -(a + 2),
+                0.11,
+                1.9,
+                0.14,
+                charcoal,
+              );
+              panel(
+                courseGroup,
+                bx,
+                y + 1.68,
+                a + 1.9,
+                2.2,
+                0.6,
+                printMat(
+                  type === "hydro"
+                    ? "SH  /  BOOST"
+                    : alloy
+                      ? "NiTi  /  LIFT"
+                      : fluid
+                        ? "STF  /  " + LEVELS[level].threshold
+                        : type === "bounce"
+                          ? "Si  /  BOUNCE"
+                          : "MV  /  " + String(i).padStart(2, "0"),
+                  "#e1c49c",
+                  "#3d3a31",
+                ),
+              );
+            }
+          }
+          batching(courseGroup);
+          $("stageNo").textContent =
+            "FIELD TRIAL   " + String(level + 1).padStart(2, "0") + " / 03";
+          $("stageName").textContent = LEVELS[level].name;
+          $("mission").textContent = LEVELS[level].mission;
+          $("total").textContent = "/ " + finish;
+        }
+        const fxCount = 64,
+          fxPos = new Float32Array(fxCount * 3),
+          fxCol = new Float32Array(fxCount * 3),
+          fxVel = new Float32Array(fxCount * 3),
+          fxLife = new Float32Array(fxCount);
+        fxPos.fill(-999);
+        const fxGeo = new T.BufferGeometry();
+        fxGeo.setAttribute("position", new T.BufferAttribute(fxPos, 3));
+        fxGeo.setAttribute("color", new T.BufferAttribute(fxCol, 3));
+        const sparks = new T.Points(
+          fxGeo,
+          new T.PointsMaterial({
+            size: 0.1,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.87,
+            depthWrite: false,
+          }),
+        );
+        sparks.frustumCulled = false;
+        scene.add(sparks);
+        let cursor = 0;
+        function burst(color, n = 24) {
+          const c = new T.Color(color);
+          for (let j = 0; j < n; j++) {
+            const i = cursor++ % fxCount,
+              k = i * 3,
+              angle = random() * Math.PI * 2;
+            fxLife[i] = 0.25 + random() * 0.55;
+            fxPos.set(
+              [
+                ball.position.x + 0.65 * Math.cos(angle),
+                ball.position.y,
+                ball.position.z + 0.65 * Math.sin(angle),
+              ],
+              k,
+            );
+            fxCol.set([c.r, c.g, c.b], k);
+            fxVel.set(
+              [
+                Math.cos(angle) * (1 + random() * 3),
+                1 + random() * 4,
+                Math.sin(angle) * (1 + random() * 3),
+              ],
+              k,
+            );
+          }
+          fxGeo.attributes.color.needsUpdate = true;
+        }
+        function updateFx(dt) {
+          for (let i = 0; i < fxCount; i++) {
+            if (fxLife[i] <= 0) continue;
+            const k = i * 3;
+            fxLife[i] -= dt;
+            for (let j = 0; j < 3; j++) fxPos[k + j] += fxVel[k + j] * dt;
+            fxVel[k + 1] -= 8 * dt;
+            if (fxLife[i] <= 0) fxPos[k + 1] = -999;
+          }
+          fxGeo.attributes.position.needsUpdate = true;
+        }
+
+        // Audio is synthesized after the first gesture. The filtered noise is shared.
+        let audioCtx,
+          noise,
+          rolling,
+          rollGain,
+          rollFilter,
+          master,
+          muted = false,
+          lastImpact = -1;
+        function unlock() {
+          try {
+            if (!audioCtx) {
+              const AC = window.AudioContext || window.webkitAudioContext;
+              if (!AC) return;
+              audioCtx = new AC();
+              master = audioCtx.createGain();
+              master.gain.value = muted ? 0 : 0.37;
+              master.connect(audioCtx.destination);
+              noise = audioCtx.createBuffer(
+                1,
+                audioCtx.sampleRate,
+                audioCtx.sampleRate,
+              );
+              let sample = noise.getChannelData(0);
+              for (let i = 0; i < sample.length; i++)
+                sample[i] = Math.random() * 2 - 1;
+              rolling = audioCtx.createBufferSource();
+              rolling.buffer = noise;
+              rolling.loop = true;
+              rollFilter = audioCtx.createBiquadFilter();
+              rollFilter.type = "lowpass";
+              rollGain = audioCtx.createGain();
+              rollGain.gain.value = 0;
+              rolling.connect(rollFilter).connect(rollGain).connect(master);
+              rolling.start();
+            }
+            if (audioCtx.state === "suspended")
+              audioCtx.resume().catch(() => {});
+          } catch {
+            /* Sound may be unavailable in an embedded browser. */
+          }
+        }
+        for (const ev of ["pointerdown", "keydown", "touchstart"])
+          window.addEventListener(ev, unlock, { capture: true, passive: true });
+        function sound(kind, strength = 1) {
+          if (!audioCtx || muted) return;
+          const t = audioCtx.currentTime,
+            d = kind === "launch" ? 0.46 : kind === "splash" ? 0.5 : 0.16;
+          const tone =
+              kind === "splash"
+                ? audioCtx.createBufferSource()
+                : audioCtx.createOscillator(),
+            g = audioCtx.createGain(),
+            f = audioCtx.createBiquadFilter();
+          f.type = "lowpass";
+          f.frequency.value = kind === "splash" ? 680 : 2500;
+          if (kind === "splash") tone.buffer = noise;
+          else {
+            tone.type = kind === "launch" ? "triangle" : "sine";
+            tone.frequency.setValueAtTime(
+              kind === "launch" ? 130 : material === 0 ? 780 : 210,
+              t,
+            );
+            tone.frequency.exponentialRampToValueAtTime(
+              kind === "launch" ? 1040 : material === 0 ? 410 : 80,
+              t + d,
+            );
+          }
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(
+            (kind === "impact" ? 0.2 : 0.4) * strength,
+            t + 0.009,
+          );
+          g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+          tone.connect(f).connect(g).connect(master);
+          tone.start(t);
+          tone.stop(t + d + 0.02);
+          tone.onended = () => {
+            tone.disconnect();
+            f.disconnect();
+            g.disconnect();
+          };
+        }
+        const keys = new Set(),
+          joy = { x: 0, y: 0 },
+          DT = 1 / 120;
+        let t = 0,
+          attemptTime = 0,
+          mode = "run",
+          sinking = false,
+          sinkTime = 0,
+          events = [],
+          surface = null,
+          landedFinal = false,
+          air = false,
+          lastSurface = "",
+          hudTime = -1,
+          pausedResume = null;
+        let yaw = 0.22,
+          tilt = 0.34,
+          zoom = 10.8,
+          camFocus = new T.Vector3(),
+          camDest = new T.Vector3(),
+          look = new T.Vector3();
+        let high = !matchMedia("(pointer:coarse)").matches,
+          reduced = matchMedia("(prefers-reduced-motion:reduce)").matches;
+        function logEvent(name, extra = {}) {
+          events.push({
+            name,
+            time: +attemptTime.toFixed(3),
+            s: +(-ball.position.z).toFixed(3),
+            y: +ball.position.y.toFixed(3),
+            v: +Math.hypot(ball.velocity.x, ball.velocity.z).toFixed(3),
+            ...extra,
+          });
+          if (events.length > 160) events.shift();
+        }
+        function choose(m, fx = true) {
+          material = m;
+          const spec = MATERIALS[m];
+          ball.material = ballPhys;
+          ball.mass = spec.mass;
+          ball.updateMassProperties();
+          contact.restitution = slickContact.restitution = spec.bounce;
+          ballMesh.material = ballMats[m];
+          document
+            .querySelectorAll(".mat")
+            .forEach((b, i) => b.setAttribute("aria-pressed", String(i === m)));
+          if (fx) {
+            burst(spec.tint);
+            logEvent("material", { m });
+          }
+        }
+        function endInput() {
+          keys.clear();
+          joy.x = joy.y = 0;
+          stickId = null;
+          dragId = null;
+          document.querySelector(".nub").style.transform =
+            "translate(-50%,-50%)";
+        }
+        function reset(build = false) {
+          if (build) buildCourse();
+          endInput();
+          choose(0, false);
+          ball.position.set(0, R + sections[0].y + 0.015, 0);
+          ball.velocity.setZero();
+          ball.angularVelocity.setZero();
+          ball.force.setZero();
+          ball.torque.setZero();
+          ball.quaternion.set(0, 0, 0, 1);
+          ball.previousPosition.copy(ball.position);
+          ball.aabbNeedsUpdate = true;
+          ball.wakeUp();
+          mode = "run";
+          landedFinal = false;
+          sinking = false;
+          sinkTime = 0;
+          temperature = 0;
+          charge = false;
+          cooldown = 0;
+          lift = 0;
+          attemptTime = 0;
+          events = [];
+          surface = sections[0];
+          air = false;
+          lastSurface = "";
+          hudTime = -1;
+          fxLife.fill(0);
+          fxPos.fill(-999);
+          fxGeo.attributes.position.needsUpdate = true;
+          for (const k of sections) {
+            k.body.collisionResponse = k.type !== "fluid";
+            k.skimmed = false;
+          }
+          $("dialog").hidden = true;
+          $("state").textContent = "试验就绪";
+          yaw = 0.22;
+          tilt = 0.34;
+          zoom = 10.8;
+          camFocus.copy(ball.position);
+          updateVisual(0, true);
+        }
+        function modal(k, title, description, action, fn) {
+          endInput();
+          if (rollGain)
+            rollGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.03);
+          $("dialogKicker").textContent = k;
+          $("dialogTitle").textContent = title;
+          $("dialogText").textContent = description;
+          $("dialogAction").textContent = action;
+          $("dialog").hidden = false;
+          pausedResume = fn;
+          $("dialogAction").focus({ preventScroll: true });
+        }
+        function finishRun() {
+          logEvent("finish");
+          mode = "finish";
+          const last = level === LEVELS.length - 1;
+          modal(
+            last ? "ALL TRIALS COMPLETE" : "TRIAL COMPLETE",
+            last ? "三项试验完成" : "已抵达终点",
+            LEVELS[level].name +
+              "  /  本次用时 " +
+              attemptTime.toFixed(2) +
+              " s",
+            last ? "重新挑战" : "进入下一关",
+            () => {
+              level = last ? 0 : level + 1;
+              reset(true);
+            },
+          );
+        }
+        function fail(reason) {
+          mode = "failed";
+          logEvent("fail", { reason });
+          modal("TRIAL INTERRUPTED", "试验中断", reason, "重试本关", () =>
+            reset(),
+          );
+        }
+        function floorAt(x, s) {
+          return sections.find(
+            (k) => s >= k.a && s < k.b && Math.abs(x - k.x) <= k.w * 0.5,
+          );
+        }
+        // Continuous sphere vs. box sweep. Distance to the closest point bounds the
+        // next safe advance, including on corners. Resting contacts stay with Cannon.
+        const before = new C.Vec3(),
+          normal = new C.Vec3();
+        function sweepDecks(old, dt) {
+          const p = ball.position,
+            dx = p.x - old.x,
+            dy = p.y - old.y,
+            dz = p.z - old.z,
+            len = Math.hypot(dx, dy, dz);
+          if (len < 0.0001) return;
+          let first = 1,
+            hit = null,
+            hx = 0,
+            hy = 0,
+            hz = 0;
+          for (const k of sections) {
+            if (
+              !k.body.collisionResponse ||
+              Math.max(-old.z, -p.z) < k.a - R ||
+              Math.min(-old.z, -p.z) > k.b + R
+            )
+              continue;
+            let u = 0;
+            for (let i = 0; i < 12 && u < first; i++) {
+              const x = old.x + dx * u,
+                y = old.y + dy * u,
+                z = old.z + dz * u;
+              const nx = x - clamp(x, k.x - k.w / 2, k.x + k.w / 2),
+                ny = y - clamp(y, k.y - 1.08, k.y),
+                nz = z - clamp(z, -k.b, -k.a),
+                dist = Math.hypot(nx, ny, nz),
+                gap = dist - R;
+              if (gap < 0.00008) {
+                if (
+                  u > 0.00001 &&
+                  dist > 0 &&
+                  dx * nx + dy * ny + dz * nz < -0.00001
+                ) {
+                  first = u;
+                  hit = k;
+                  hx = nx / dist;
+                  hy = ny / dist;
+                  hz = nz / dist;
+                }
+                break;
+              }
+              u += gap / len;
+            }
+          }
+          if (!hit) return;
+          normal.set(hx, hy, hz);
+          const vn = ball.velocity.dot(normal);
+          if (vn >= 0) return;
+          const impact = -vn;
+          ball.position.set(
+            old.x + dx * first + hx * 0.00015,
+            old.y + dy * first + hy * 0.00015,
+            old.z + dz * first + hz * 0.00015,
+          );
+          const bounce = impact > 1 ? MATERIALS[material].bounce : 0;
+          ball.velocity.addScaledVector(
+            -(1 + bounce) * vn,
+            normal,
+            ball.velocity,
+          );
+          ball.position.addScaledVector(
+            dt * (1 - first),
+            ball.velocity,
+            ball.position,
+          );
+          ball.aabbNeedsUpdate = true;
+          if (impact > 2.5) impactEvent(hit, impact);
+        }
+        function impactEvent(k, amount) {
+          if (t - lastImpact < 0.1) return;
+          lastImpact = t;
+          sound("impact", Math.min(1, amount / 12));
+          if (k && (k.type === "bounce" || k.type === "landing"))
+            logEvent("land", { deck: k.type, impact: +amount.toFixed(2) });
+        }
+        ball.addEventListener("collide", (e) => {
+          const impact = Math.abs(e.contact.getImpactVelocityAlongNormal());
+          if (impact > 2.5)
+            impactEvent(
+              sections.find((k) => k.body === e.body),
+              impact,
+            );
+        });
+        function supportsFluid(horizontalSpeed, threshold) {
+          return horizontalSpeed >= threshold;
+        }
+        function step(dt) {
+          if (mode !== "run") return;
+          t += dt;
+          attemptTime += dt;
+          const p = ball.position,
+            v = ball.velocity,
+            s = -p.z,
+            levelSpec = LEVELS[level],
+            spec = MATERIALS[material];
+          const k = floorAt(p.x, s),
+            near = k && p.y - R <= k.y + 0.16 && p.y >= k.y - 0.22;
+          let ax =
+            joy.x +
+            (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) -
+            (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0);
+          let az =
+            joy.y +
+            (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) -
+            (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
+          let n = Math.max(1, Math.hypot(ax, az));
+          ax /= n;
+          az /= n;
+          const control = near ? 1 : 0.2;
+          if (!sinking) {
+            // The force along X servos lateral velocity. Light balls respond faster.
+            const targetX = ax * spec.cap * 0.64;
+            const lateral =
+              (targetX - v.x) *
+              (Math.abs(ax) > 0.03 ? spec.steer * 0.19 : spec.steer * 0.11);
+            const wind =
+              s > 10 ? levelSpec.wind * Math.sin(s * 0.075 + t * 0.6) : 0;
+            ball.force.x +=
+              ball.mass * control * clamp(lateral, -spec.steer, spec.steer) +
+              wind;
+            ball.force.z -=
+              ball.mass *
+              control *
+              (az * spec.drive + (near && k.type === "hydro" ? 12 : 0));
+            if (near && k.type !== "hydro" && Math.abs(az) < 0.04)
+              v.z *= Math.exp(-1.3 * dt);
+            const speed = Math.hypot(v.x, v.z);
+            if (speed > spec.cap) {
+              v.x *= spec.cap / speed;
+              v.z *= spec.cap / speed;
+            }
+          }
+          // Evaluate the free horizontal speed before enabling the STF contact body.
+          // The leading spherical cap may reach the pool before its centre does.
+          const vx = v.x + (ball.force.x / ball.mass) * dt,
+            vz = v.z + (ball.force.z / ball.mass) * dt;
+          const speed = Math.hypot(v.x, v.z),
+            nextX = p.x + vx * dt,
+            nextS = s - vz * dt;
+          for (const pool of sections) {
+            if (pool.type !== "fluid") continue;
+            const inside =
+              nextS >= pool.a &&
+              nextS < pool.b &&
+              Math.abs(nextX - pool.x) <= pool.w / 2;
+            const touching =
+              inside && p.y - R <= pool.y + 0.08 && p.y > pool.y - 0.35;
+            pool.body.collisionResponse =
+              !sinking && supportsFluid(speed, levelSpec.threshold);
+            if (!inside) pool.skimmed = false;
+            if (touching && !sinking) {
+              if (!pool.body.collisionResponse) {
+                sinking = true;
+                logEvent("sink", { threshold: levelSpec.threshold });
+                sound("splash");
+                burst(0xe2e2c9, 16);
+              } else if (!pool.skimmed) {
+                pool.skimmed = true;
+                logEvent("skim", { threshold: levelSpec.threshold });
+                sound("splash", 0.45);
+              }
+            }
+          }
+          if (sinking) {
+            sinkTime += dt;
+            ball.force.setZero();
+            v.x *= Math.exp(-4 * dt);
+            v.z *= Math.exp(-4 * dt);
+            v.y = Math.max(v.y, -1.6);
+            if (sinkTime > 1.28) {
+              fail(
+                "水平速度低于 " +
+                  levelSpec.threshold +
+                  " m/s，滚珠陷入流体。换碳纤球，在涂层段持续向前加速。",
+              );
+              return;
+            }
+          }
+          const occupied = near && k.type === "alloy" && !sinking;
+          cooldown = Math.max(0, cooldown - dt);
+          lift = Math.max(0, lift - dt * 2.45);
+          const pulse = attemptTime % 7 > 6.35;
+          if (cooldown === 0 && ((occupied && material === 0) || pulse)) {
+            if (!charge) {
+              logEvent("heat", {
+                source: occupied && material === 0 ? "steel" : "pulse",
+              });
+              charge = true;
+            }
+            temperature = Math.min(1, temperature + dt * 3.7);
+          } else if (!charge) temperature = Math.max(0, temperature - dt * 2.6);
+          if (charge) {
+            if (!pulse && !(occupied && material === 0))
+              temperature = Math.max(0, temperature - dt * 0.9);
+            if (temperature === 0) charge = false;
+          }
+          if (temperature >= 1 && cooldown === 0) {
+            lift = 1;
+            cooldown = 1.4;
+            charge = false;
+            sound("launch", occupied ? 1 : 0.28);
+            if (occupied) {
+              ball.applyImpulse(
+                new C.Vec3(
+                  0,
+                  ball.mass * (15 - v.y),
+                  ball.mass * (-clamp(-v.z, 16.5, 18.5) - v.z),
+                ),
+              );
+              burst(0xffba57);
+              logEvent("launch", {
+                source: material === 0 ? "steel" : "pulse",
+              });
+            }
+          }
+          before.copy(p);
+          world.step(dt);
+          if (!sinking) sweepDecks(before, dt);
+          surface = floorAt(p.x, -p.z);
+          air = !surface || p.y - R > surface.y + 0.19;
+          if (surface && !air && !sinking && lastSurface !== surface.type)
+            logEvent("surface", { deck: surface.type });
+          lastSurface = surface && !air ? surface.type : "";
+          if (p.y < -8) {
+            fail("滚珠跌出了赛道。留意边缘刻度，在跳台中央保持向前速度。");
+            return;
+          }
+          if (surface === sections.at(-1) && !air && !sinking)
+            landedFinal = true;
+          if (
+            landedFinal &&
+            surface === sections.at(-1) &&
+            -p.z >= finish &&
+            !sinking
+          )
+            finishRun();
+        }
+        function drawMap() {
+          const c = $("map"),
+            g = c.getContext("2d"),
+            w = c.width,
+            h = c.height,
+            pad = 9;
+          g.clearRect(0, 0, w, h);
+          const px = (s) => pad + ((w - pad * 2) * s) / finish,
+            py = (y) => h * 0.68 - y * 4.6;
+          g.strokeStyle = "#d6cfc0";
+          g.lineWidth = 1;
+          for (let i = 0; i < 10; i++) {
+            const x = pad + (i * (w - 2 * pad)) / 9;
+            g.beginPath();
+            g.moveTo(x, 12);
+            g.lineTo(x, h - 6);
+            g.stroke();
+          }
+          for (const k of sections) {
+            let a = px(Math.max(0, k.a)),
+              b = px(Math.min(finish, k.b));
+            g.lineWidth = 5;
+            g.strokeStyle =
+              {
+                hydro: "#5b8f83",
+                alloy: "#a55e38",
+                fluid: "#92a9a0",
+                bounce: "#b87a58",
+              }[k.type] || "#6a6c5f";
+            g.beginPath();
+            g.moveTo(a, py(k.y));
+            g.lineTo(b, py(k.y));
+            g.stroke();
+          }
+          g.fillStyle = "#3d4036";
+          g.fillRect(px(finish) - 1, py(sections.at(-1).y) - 14, 2, 15);
+          g.fillRect(px(finish) + 1, py(sections.at(-1).y) - 14, 6, 4);
+          const x = px(clamp(-ball.position.z, 0, finish)),
+            y = py(clamp(ball.position.y - R, -2, 8)) - 5;
+          g.beginPath();
+          g.arc(x, y, 6, 0, Math.PI * 2);
+          g.fillStyle = "#b76536";
+          g.fill();
+          g.strokeStyle = "#f9f2da";
+          g.lineWidth = 2;
+          g.stroke();
+        }
+        function updateHud() {
+          const speed = Math.hypot(ball.velocity.x, ball.velocity.z),
+            s = clamp(-ball.position.z, 0, finish);
+          $("speed").textContent = speed.toFixed(1);
+          $("meter").style.width = Math.min(100, (speed / 26) * 100) + "%";
+          $("distance").textContent = String(Math.floor(s)).padStart(3, "0");
+          $("pct").textContent = Math.floor((s / finish) * 100) + "%";
+          drawMap();
+          const type = surface?.type,
+            info = typeNames[type] || ["AIR", "断崖上空"];
+          $("surfaceCode").textContent = "TRACK / " + info[0];
+          $("surfaceName").textContent =
+            info[1] +
+            (type === "fluid"
+              ? " · 临界 " + LEVELS[level].threshold + " m/s"
+              : "");
+          const status = sinking
+            ? "失去支撑 · 正在下沉"
+            : lift > 0.52
+              ? "合金相变 · 弹射"
+              : air
+                ? "空中飞行"
+                : type === "fluid"
+                  ? "高速硬化 · 掠过流体"
+                  : type === "alloy"
+                    ? charge
+                      ? "通电加热 · " + Math.round(temperature * 100) + "%"
+                      : "等待钢球或热脉冲"
+                    : type === "hydro"
+                      ? "低阻加速"
+                      : type === "bounce"
+                        ? "弹性碰撞"
+                        : s < 1
+                          ? "试验就绪"
+                          : "试验进行中";
+          $("state").textContent = status;
+        }
+        function updateVisual(dt, snap = false) {
+          for (const gate of gates)
+            gate.visible = -ball.position.z < gate.userData.gateS + 0.12;
+          ballMesh.position.copy(ball.position);
+          ballMesh.quaternion.copy(ball.quaternion);
+          const k = surface;
+          shadow.visible = !!k && !sinking && ball.position.y >= k.y;
+          if (k) {
+            const h = Math.max(0, ball.position.y - k.y - R);
+            shadow.position.set(ball.position.x, k.y + 0.059, ball.position.z);
+            shadow.scale.setScalar(1 + h * 0.1);
+            shadow.material.opacity = Math.max(0.14, 0.87 - h * 0.11);
+          }
+          if (board) board.rotation.x = Math.sin(Math.PI * (1 - lift)) * 0.2;
+          [hydroMat, alloyMat, fluidMat].forEach(
+            (m) => (m.uniforms.clock.value = t),
+          );
+          alloyMat.uniforms.heat.value = Math.max(temperature, lift);
+          fluidMat.uniforms.hard.value =
+            k?.type === "fluid" && !sinking ? 1 : 0;
+          fluidMat.uniforms.ball.value.set(ball.position.x, ball.position.z);
+          updateFx(dt);
+          const factor = snap ? 1 : 1 - Math.exp(-dt * (reduced ? 16 : 9));
+          camDest.set(
+            ball.position.x,
+            Math.max(-2, ball.position.y),
+            ball.position.z,
+          );
+          camFocus.lerp(camDest, factor);
+          const d = zoom * (camera.aspect < 0.85 ? 1.28 : 1),
+            pitch = tilt + (camera.aspect < 0.85 ? 0.07 : 0);
+          camera.position.set(
+            camFocus.x + Math.sin(yaw) * Math.cos(pitch) * d,
+            camFocus.y + Math.sin(pitch) * d + 0.65,
+            camFocus.z + Math.cos(yaw) * Math.cos(pitch) * d,
+          );
+          look.set(
+            camFocus.x,
+            camFocus.y + 1.6,
+            camFocus.z - (camera.aspect < 0.85 ? 6.5 : 5.8),
+          );
+          camera.lookAt(look);
+          sky.position.copy(camera.position);
+          sun.target.position.set(camFocus.x, 0, camFocus.z - 4);
+          sun.position.copy(sun.target.position).add(lightOffset);
+          if (rollGain) {
+            const v = Math.hypot(ball.velocity.x, ball.velocity.z),
+              on = mode === "run" && !air && !sinking;
+            rollGain.gain.setTargetAtTime(
+              on ? Math.min(0.18, v * 0.007) : 0,
+              audioCtx.currentTime,
+              0.06,
+            );
+            rollFilter.frequency.setTargetAtTime(
+              140 + v * (material === 0 ? 27 : 14),
+              audioCtx.currentTime,
+              0.08,
+            );
+          }
+          if (snap || t - hudTime > 0.075) {
+            updateHud();
+            hudTime = t;
+          }
+        }
+        const lightOffset = new T.Vector3(-19, 28, 13);
+
+        // Touches stay assigned to their original control until release.
+        let stickId = null,
+          dragId = null,
+          lastX = 0,
+          lastY = 0;
+        const pad = $("pad"),
+          nub = pad.querySelector(".nub"),
+          view = $("view");
+        function moveStick(x, y) {
+          const r = pad.getBoundingClientRect(),
+            range = r.width * 0.32,
+            dx = (x - r.left - r.width / 2) / range,
+            dy = (y - r.top - r.height / 2) / range,
+            n = Math.max(1, Math.hypot(dx, dy));
+          joy.x = dx / n;
+          joy.y = -dy / n;
+          nub.style.transform =
+            "translate(calc(-50% + " +
+            joy.x * range +
+            "px),calc(-50% + " +
+            -joy.y * range +
+            "px))";
+        }
+        function releaseStick() {
+          stickId = null;
+          joy.x = joy.y = 0;
+          nub.style.transform = "translate(-50%,-50%)";
+        }
+        pad.addEventListener(
+          "touchstart",
+          (e) => {
+            e.preventDefault();
+            if (stickId === null && mode === "run") {
+              const a = e.changedTouches[0];
+              stickId = a.identifier;
+              moveStick(a.clientX, a.clientY);
+            }
+          },
+          { passive: false },
+        );
+        pad.addEventListener(
+          "touchmove",
+          (e) => {
+            e.preventDefault();
+            const a = Array.from(e.changedTouches).find(
+              (p) => p.identifier === stickId,
+            );
+            if (a) moveStick(a.clientX, a.clientY);
+          },
+          { passive: false },
+        );
+        for (const name of ["touchend", "touchcancel"])
+          pad.addEventListener(name, (e) => {
+            if (
+              Array.from(e.changedTouches).some((p) => p.identifier === stickId)
+            )
+              releaseStick();
+          });
+        pad.addEventListener("pointerdown", (e) => {
+          if (e.pointerType === "touch" || mode !== "run") return;
+          pad.setPointerCapture(e.pointerId);
+          stickId = e.pointerId;
+          moveStick(e.clientX, e.clientY);
+        });
+        pad.addEventListener("pointermove", (e) => {
+          if (e.pointerType !== "touch" && e.pointerId === stickId)
+            moveStick(e.clientX, e.clientY);
+        });
+        pad.addEventListener("pointerup", (e) => {
+          if (e.pointerType !== "touch" && e.pointerId === stickId)
+            releaseStick();
+        });
+        view.addEventListener("pointerdown", (e) => {
+          if (dragId !== null || mode !== "run") return;
+          dragId = e.pointerId;
+          lastX = e.clientX;
+          lastY = e.clientY;
+          view.setPointerCapture(dragId);
+        });
+        view.addEventListener("pointermove", (e) => {
+          if (e.pointerId !== dragId) return;
+          yaw = clamp(yaw - (e.clientX - lastX) * 0.006, -1.15, 1.15);
+          tilt = clamp(tilt + (e.clientY - lastY) * 0.004, 0.2, 0.95);
+          lastX = e.clientX;
+          lastY = e.clientY;
+        });
+        for (const ev of ["pointerup", "pointercancel", "lostpointercapture"])
+          view.addEventListener(ev, (e) => {
+            if (e.pointerId === dragId) dragId = null;
+          });
+        view.addEventListener(
+          "wheel",
+          (e) => {
+            e.preventDefault();
+            zoom = clamp(zoom + e.deltaY * 0.012, 6.5, 17);
+          },
+          { passive: false },
+        );
+        const driveKeys = [
+          "KeyW",
+          "KeyA",
+          "KeyS",
+          "KeyD",
+          "ArrowUp",
+          "ArrowDown",
+          "ArrowLeft",
+          "ArrowRight",
+        ];
+        window.addEventListener("keydown", (e) => {
+          if (e.ctrlKey || e.altKey || e.metaKey) return;
+          if (driveKeys.includes(e.code)) {
+            e.preventDefault();
+            if (mode === "run") keys.add(e.code);
+            return;
+          }
+          if (e.repeat) return;
+          if (e.code === "KeyR") {
+            reset();
+            return;
+          }
+          if (mode === "run" && /^Digit[123]$/.test(e.code))
+            choose(Number(e.code.slice(-1)) - 1);
+          if (e.code === "Escape" && mode === "help") $("dialogAction").click();
+        });
+        window.addEventListener("keyup", (e) => keys.delete(e.code));
+        window.addEventListener("blur", endInput);
+        document.addEventListener("visibilitychange", () => {
+          endInput();
+          lastTime = performance.now();
+          acc = 0;
+          if (document.hidden && rollGain) rollGain.gain.value = 0;
+        });
+        function actionButton(button, action) {
+          button.addEventListener("pointerdown", (e) => {
+            if (e.pointerType === "touch") {
+              e.preventDefault();
+              action();
+            }
+          });
+          button.addEventListener("click", (e) => {
+            if (e.pointerType !== "touch") action();
+          });
+        }
+        document.querySelectorAll(".mat").forEach((b) =>
+          actionButton(b, () => {
+            if (mode === "run") choose(Number(b.dataset.m));
+          }),
+        );
+        actionButton($("reset"), () => reset());
+        $("dialogAction").onclick = () => {
+          const fn = pausedResume;
+          pausedResume = null;
+          fn?.();
+        };
+        $("helpBtn").onclick = () => {
+          if (mode !== "run") return;
+          mode = "help";
+          modal(
+            "FIELD MANUAL",
+            "操作与材料手册",
+            "WASD 或方向键移动，1 / 2 / 3 换材质，R 重试。手机用左侧摇杆移动，滑动赛道调整视角。\n\n钢球导通 NiTi 跳板，橙色表示加热，周期热脉冲也能触发弹射。碳纤球在青色涂层上起步最快。硅胶球能把落地冲击转为下一次反弹。\n\n流体比较水平速度与关卡阈值，达到阈值才提供支撑。",
+            "返回赛道",
+            () => {
+              mode = "run";
+              $("dialog").hidden = true;
+            },
+          );
+        };
+        $("audio").onclick = () => {
+          unlock();
+          muted = !muted;
+          if (master)
+            master.gain.setTargetAtTime(
+              muted ? 0 : 0.37,
+              audioCtx.currentTime,
+              0.03,
+            );
+          $("audio")
+            .querySelector("use")
+            .setAttribute("href", muted ? "#mute" : "#sound");
+          $("audio").setAttribute("aria-label", muted ? "开启声音" : "静音");
+        };
+        function resize() {
+          const r = view.parentElement.getBoundingClientRect();
+          camera.aspect = r.width / r.height;
+          camera.fov =
+            camera.aspect < 0.85 ? 59 : camera.aspect > 2.3 ? 51 : 46;
+          camera.updateProjectionMatrix();
+          renderer.setPixelRatio(
+            high
+              ? Math.min(window.devicePixelRatio, 2)
+              : Math.min(window.devicePixelRatio, 1),
+          );
+          renderer.setSize(r.width, r.height, false);
+          renderer.shadowMap.enabled = high;
+          sun.castShadow = high;
+          $("quality").querySelector("span").textContent =
+            "画质 · " + (high ? "高" : "流畅");
+        }
+        $("quality").onclick = () => {
+          high = !high;
+          resize();
+        };
+        new ResizeObserver(resize).observe(view.parentElement);
+        let lastTime = performance.now(),
+          acc = 0;
+        resize();
+        reset(true);
+        const verification = new URLSearchParams(location.search).has("verify");
+        function draw() {
+          renderer.render(scene, camera);
+        }
+        function tick(now) {
+          const dt = Math.min((now - lastTime) / 1000, 0.1);
+          lastTime = now;
+          if (!document.hidden && mode === "run") {
+            acc += dt;
+            while (acc >= DT) {
+              step(DT);
+              acc -= DT;
+            }
+            updateVisual(dt);
+          }
+          draw();
+          requestAnimationFrame(tick);
+        }
+        if (verification) {
+          // A deterministic clock for automation. Inputs and course rules are identical.
+          window.trialTest = {
+            supportsFluid,
+            advance(n, until) {
+              for (let i = 0; i < n; i++) {
+                step(DT);
+                updateVisual(DT);
+                if (mode !== "run" || until?.(this.read())) break;
+              }
+              updateHud();
+              draw();
+              return this.read();
+            },
+            read() {
+              return {
+                level,
+                material,
+                mode,
+                s: -ball.position.z,
+                x: ball.position.x,
+                y: ball.position.y,
+                v: Math.hypot(ball.velocity.x, ball.velocity.z),
+                vz: -ball.velocity.z,
+                vy: ball.velocity.y,
+                temperature,
+                air,
+                sinking,
+                joy: { ...joy },
+                yaw,
+                zoom,
+                high,
+                audio: audioCtx?.state,
+                events: events.slice(),
+                deck: surface?.type,
+                threshold: LEVELS[level].threshold,
+                time: attemptTime,
+              };
+            },
+            render: draw,
+          };
+          draw();
+        } else requestAnimationFrame(tick);
+        document.body.dataset.ready = "true";
+      } catch (error) {
+        console.error(error);
+        $("state").textContent = "加载失败";
+        $("dialog").hidden = false;
+        $("dialogTitle").textContent = "试验场未能启动";
+        $("dialogText").textContent =
+          "请检查网络能否访问 jsDelivr，并使用支持 WebGL 的浏览器。" +
+          (error?.message ? "\n" + error.message : "");
+        $("dialogAction").textContent = "重新加载";
+        $("dialogAction").onclick = () => location.reload();
+      }
+    </script>
+  </body>
+</html>
