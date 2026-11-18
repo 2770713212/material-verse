@@ -847,6 +847,94 @@
           min-height: 40px;
         }
       }
+
+      .expedition-data {
+        display: flex;
+        justify-content: space-between;
+        gap: 5px;
+        color: #625c4c;
+        font: 600 10px var(--mono);
+        margin-top: 8px;
+      }
+      .expedition-data b {
+        color: #825d32;
+      }
+      .jump {
+        position: absolute;
+        right: max(18px, env(safe-area-inset-right));
+        bottom: 18px;
+        min-width: 78px;
+        min-height: 49px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        background: #f8f2e4;
+        color: #342f27;
+        border: 1px solid #9e8c70;
+        border-bottom: 3px solid #a7703f;
+        border-radius: 5px;
+        font-weight: 650;
+      }
+      .jump small {
+        font: 10px var(--mono);
+        color: #665740;
+      }
+      .jump[aria-disabled="true"] {
+        background: #e4ddcf;
+        color: #776854;
+      }
+      .sheet {
+        max-height: 100%;
+        overflow: auto;
+      }
+      .course canvas {
+        height: 53px;
+      }
+      @media (pointer: coarse), (hover: none) {
+        .scene-tag {
+          bottom: 78px;
+          right: 17px;
+        }
+        .jump {
+          min-width: 83px;
+          min-height: 53px;
+        }
+        .jump small {
+          font-size: 10px;
+        }
+      }
+      @media (max-width: 650px) {
+        .course canvas {
+          height: 29px;
+        }
+        .expedition-data {
+          font-size: 9px;
+          margin-top: 5px;
+        }
+        .jump {
+          right: 14px;
+          bottom: 17px;
+        }
+      }
+      @media (max-height: 540px) and (orientation: landscape) {
+        .course canvas {
+          height: 20px;
+        }
+        .expedition-data {
+          margin-top: 3px;
+        }
+        .scene-tag {
+          bottom: 63px;
+        }
+        .jump {
+          min-height: 45px;
+          bottom: 10px;
+        }
+        .sheet {
+          font-size: 13px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -916,6 +1004,9 @@
         <div class="dist">
           <b id="distance">000</b> m <span id="total">/ 000</span>
         </div>
+        <div class="expedition-data">
+          <span id="cp">CP 0/3</span><b id="samples">◇ 0/3</b>
+        </div>
       </aside>
       <div class="scene-tag">
         <b id="surfaceCode">TRACK / 00</b><span id="surfaceName">起点平台</span>
@@ -923,6 +1014,9 @@
       <div id="pad" class="pad" aria-label="移动摇杆">
         <div class="nub"></div>
       </div>
+      <button class="jump" id="jump" aria-label="微脉冲跳跃">
+        <span>↑ 微跳</span><small id="jumpStatus">就绪</small>
+      </button>
       <div class="dialog" id="dialog" hidden>
         <div
           class="sheet"
@@ -972,8 +1066,8 @@
     </section>
     <footer>
       <span><b>W A S D / ↑ ↓ ← →</b> 移动</span
-      ><span><b>1 / 2 / 3</b> 切换材质</span><span><b>拖拽</b> 调整视角</span
-      ><span><b>滚轮</b> 缩放</span
+      ><span><b>1 / 2 / 3</b> 切换材质</span><span><b>SPACE</b> 微跳</span
+      ><span><b>拖拽</b> 调整视角</span><span><b>滚轮</b> 缩放</span
       ><span class="revs">MV &nbsp;/&nbsp; MATERIAL DYNAMICS LAB</span>
     </footer>
     <script type="module">
@@ -1162,7 +1256,7 @@
           ivory = standard(0xe4d4aa),
           turq = standard(0x77ad9a),
           red = standard(0xb66848);
-        box(worldGroup, 0, -14.2, -55, 500, 2, 520, sand);
+        box(worldGroup, 0, -14.2, -270, 500, 2, 910, sand);
         // Each mesa is one faceted mesh. Recessed strata follow the same eroded outline.
         const terrainChunks = new Map(),
           rockFace = new T.MeshLambertMaterial({
@@ -1237,17 +1331,17 @@
           chunk.colors.push(...colors);
         }
         for (let side of [-1, 1]) {
-          for (let i = 0; i < 18; i++) {
+          for (let i = 0; i < 56; i++) {
             const z = 30 - i * 12 + random() * 9;
             mesa(
-              side * (25 + random() * 36),
+              side * (34 + random() * 33),
               z,
               5 + random() * 10,
               6 + random() * 10,
               10 + random() * 16,
             );
           }
-          for (let i = 0; i < 19; i++)
+          for (let i = 0; i < 48; i++)
             mesa(
               side * (64 + random() * 59),
               42 - i * 14,
@@ -1260,7 +1354,7 @@
         for (let i = 0; i < 13; i++)
           mesa(
             -115 + i * 19,
-            -184 - random() * 25,
+            -630 - random() * 25,
             14 + random() * 11,
             12 + random() * 10,
             22 + random() * 25,
@@ -1287,7 +1381,7 @@
           dummy.position.set(
             (random() - 0.5) * 180,
             -13 + random() * 0.65,
-            48 - random() * 235,
+            48 - random() * 720,
           );
           dummy.scale.set(
             1 + random() * 2,
@@ -1551,6 +1645,11 @@
           }
         }
         function buildCourse() {
+          clearShards();
+          samples.length = 0;
+          checkpoints.length = 0;
+          scanners.length = 0;
+          board = null;
           for (const b of colliders) world.removeBody(b);
           colliders = [];
           for (const obj of courseGroup.children) {
@@ -1560,17 +1659,14 @@
           for (const a of courseAssets) a.dispose();
           courseAssets.length = 0;
           gates.length = 0;
-          sections = LEVELS[level].sections.map(([type, a, b, y, x, w]) => ({
-            type,
-            a,
-            b,
-            y,
-            x,
-            w,
-          }));
-          finish = sections.at(-1).b - 3;
+          sections = makeRoute();
+          finish = lengths[level];
           const arrows = printMat("❯    ❯    ❯", null, "#dcdcc0", 72);
           for (const [i, k] of sections.entries()) {
+            if (k.custom) {
+              makeRibbon(k);
+              continue;
+            }
             const { type, a, b, y, x, w } = k,
               mid = (a + b) / 2,
               len = b - a,
@@ -1807,6 +1903,7 @@
               );
             }
           }
+          makeStations();
           batching(courseGroup);
           $("stageNo").textContent =
             "FIELD TRIAL   " + String(level + 1).padStart(2, "0") + " / 03";
@@ -1873,6 +1970,566 @@
             if (fxLife[i] <= 0) fxPos[k + 1] = -999;
           }
           fxGeo.attributes.position.needsUpdate = true;
+        }
+
+        // A route is sampled in metres along the laboratory's survey axis. Its ribbon
+        // supplies the exact same vertices to Three.js and Cannon, including both forks.
+        const smooth = (u) => {
+          u = clamp(u, 0, 1);
+          return u * u * (3 - 2 * u);
+        };
+        const stationMarks = [150, 300, 450],
+          lengths = [486, 516, 554];
+        const orders = [
+          ["glass", "magnet", "laser"],
+          ["laser", "glass", "magnet"],
+          ["magnet", "laser", "glass"],
+        ];
+        const rules = {
+          glass: "玻璃限载 · 换碳纤或硅胶",
+          magnet: "75° 磁轨 · 换钢球",
+          laser: "激光扫射 · 钢球或碳纤",
+          beam: "窄梁 · 控制横向速度",
+          bend: "急转 S 弯 · 提前减速",
+          fork: "左侧高线采样，右侧低线绕行",
+          high: "高架捷径 · 断缝前微跳",
+          low: "下层宽道 · 沿弯道前进",
+          crest: "样本悬于断缝 · 起跳采样",
+          terrace: "落地后继续前进",
+        };
+        Object.assign(typeNames, {
+          glass: ["GL", "脆性微晶玻璃桥"],
+          magnet: ["EM", "强磁侧壁轨"],
+          laser: ["IR", "激光烧蚀区"],
+          beam: ["BM", "窄梁平衡木"],
+          bend: ["SC", "急转 S 弯"],
+          fork: ["Y", "双层分岔"],
+          high: ["H", "高架采样捷径"],
+          low: ["L", "低层绕行道"],
+          crest: ["Δ", "高台采样梁"],
+          terrace: ["LD", "高台着陆区"],
+        });
+        const glassSkin = surfaceMat(
+          `vec2 cell=p*.88;vec2 id=floor(cell);vec2 u=fract(cell);float one=8.,two=8.;for(int i=-1;i<=1;i++){for(int j=-1;j<=1;j++){vec2 a=vec2(float(i),float(j));vec2 seed=.16+.68*vec2(hash(id+a),hash(id+a+4.13));float d=length(a+seed-u);if(d<one){two=one;one=d;}else two=min(two,d);}}float crack=1.-smoothstep(.008,.036,two-one);float stress=smoothstep(.12,.88,heat);float grid=step(.98,fract(p.y*.37));vec3 c=mix(vec3(.39,.72,.76),vec3(.90,.98,.96),crack*(.13+.85*stress)+grid*.17);gl_FragColor=vec4(c,.43+crack*(.10+.45*stress));`,
+          true,
+        );
+        const railSkin = surfaceMat(
+          `float coil=.5+.5*cos(p.y*3.14);float wave=pow(.5+.5*cos(p.y*.75+clock*4.),5.);float line=smoothstep(.75,1.,coil);vec3 c=mix(vec3(.14,.24,.29),vec3(.28,.45,.49),line);c+=vec3(.08,.37,.52)*wave*(.35+line*.65);gl_FragColor=vec4(c,1.);`,
+        );
+        const signalBlue = new T.MeshBasicMaterial({ color: 0x78d5f7 }),
+          sampleLight = new T.MeshBasicMaterial({ color: 0xffce70 }),
+          beaconLight = new T.MeshBasicMaterial({ color: 0xb3f3c6 }),
+          laserCore = new T.MeshBasicMaterial({ color: 0xff4542 });
+        const laserHalo = new T.MeshBasicMaterial({
+          color: 0xfd4839,
+          transparent: true,
+          opacity: 0.16,
+          depthWrite: false,
+        });
+        const gemMaterial = new T.MeshStandardMaterial({
+          color: 0xf3ad53,
+          emissive: 0xc88729,
+          emissiveIntensity: 0.6,
+          metalness: 0.48,
+          roughness: 0.23,
+          flatShading: true,
+        });
+        const gemShape = new T.OctahedronGeometry(0.52),
+          haloShape = new T.TorusGeometry(0.78, 0.023, 6, 28);
+        railSkin.side = T.DoubleSide;
+        const beaconGlow = new T.SpriteMaterial({
+          map: texture(64, 64, (g, w, h) => {
+            const gradient = g.createRadialGradient(32, 32, 1, 32, 32, 31);
+            gradient.addColorStop(0, "rgba(205,255,203,.85)");
+            gradient.addColorStop(0.35, "rgba(174,235,181,.32)");
+            gradient.addColorStop(1, "rgba(155,218,157,0)");
+            g.fillStyle = gradient;
+            g.fillRect(0, 0, w, h);
+          }),
+          transparent: true,
+          depthWrite: false,
+        });
+        const shards = [],
+          samples = [],
+          checkpoints = [],
+          scanners = [];
+        let station = 0,
+          losses = 0,
+          jumpReadyAt = 0,
+          pulseSpent = false,
+          recovery = 0,
+          feedback = "",
+          feedbackUntil = 0,
+          attached = false,
+          timerStarted = false;
+        function makeRoute() {
+          const index = level,
+            previous = LEVELS[index].sections,
+            route = previous.map(([type, a, b, y, x, w]) => ({
+              type: type === "landing" ? "terrace" : type,
+              a,
+              b,
+              y,
+              x,
+              w,
+            }));
+          const last = route.at(-1);
+          last.b = [91, 111, 142][index];
+          function add(type, a, b, w = 9, x = 0, y = 0, shape) {
+            route.push({ type, a, b, w, x, y, shape, custom: true });
+          }
+          const flat = (type, a, b, w = 9) => add(type, a, b, w);
+          const ramp = (type, a, b, y0, y1, w = 9, x = 0) =>
+            add(type, a, b, w, x, y0, (s) => ({
+              x,
+              y: y0 + (y1 - y0) * smooth((s - a) / (b - a)),
+            }));
+          if (index === 0) {
+            add("glass", 91, 116, 8, 0, last.y);
+            ramp("road", 116, 142, last.y, 0);
+          }
+          if (index === 1) {
+            add("laser", 111, 131, 9, 0, last.y);
+            ramp("road", 131, 142, last.y, 0);
+          }
+          if (index === 2) ramp("road", 142, 148, last.y, 0);
+          flat("road", index === 2 ? 148 : 142, 161, 12);
+          const bend = (s, a, b, amplitude) =>
+            amplitude *
+            Math.sin((2 * Math.PI * (s - a)) / (b - a)) *
+            Math.pow(Math.sin((Math.PI * (s - a)) / (b - a)), 0.8);
+          add("bend", 161, 207, 10, 0, 0, (s) => ({
+            x: bend(s, 161, 207, 8 + index),
+            y: 0,
+          }));
+          flat("fork", 207, 218, 17);
+          const highX = -4.4,
+            highY = (s) =>
+              5 * smooth((s - 218) / 20) * (1 - smooth((s - 270) / 20));
+          for (const [a, b] of [
+            [218, 249],
+            [252, 290],
+          ])
+            add("high", a, b, 4.4, highX, 0, (s) => ({
+              x: highX,
+              y: highY(s),
+            }));
+          // Wide lower course passes under the high deck, swings around the rock and rejoins.
+          add("low", 218, 290, 8.1, 4.5, 0, (s) => {
+            const u = (s - 218) / 72;
+            return {
+              x: 4.6 + 14 * Math.sin(2 * Math.PI * u) * Math.sin(Math.PI * u),
+              y: -1.5 * Math.sin(Math.PI * u) ** 2,
+            };
+          });
+          flat("fork", 290, 309, 17);
+          const zones = [
+            [309, 355],
+            [355, 401],
+            [401, 447],
+          ];
+          orders[index].forEach((type, i) => {
+            const [a, b] = zones[i];
+            flat("road", a, a + 3, 9);
+            if (type === "magnet")
+              add(type, a + 3, b, 9.5, 0, 0, (s) => ({
+                x: 0,
+                y: 0,
+                angle:
+                  ((75 * Math.PI) / 180) *
+                  smooth((s - a - 3) / 9) *
+                  (1 - smooth((s - (b - 9)) / 9)),
+              }));
+            else if (type === "glass") {
+              flat("glass", a + 3, b - 10, 7);
+              flat("beam", b - 10, b, 3.6);
+            } else {
+              flat("laser", a + 3, b - 9, 9);
+              flat("beam", b - 9, b, 4);
+            }
+          });
+          const end = lengths[index],
+            lip = end - 20;
+          flat("road", 447, 454, 10);
+          const top = (s) => 2.4 * smooth((s - 454) / Math.min(12, lip - 454));
+          add("crest", 454, lip, 4.6, 0, 0, (s) => ({ x: 0, y: top(s) }));
+          add("crest", lip + 3, end - 8, 4.6, 0, 2.4);
+          add("landing", end - 8, end + 3, 10, 0, 2.4);
+          return route;
+        }
+        function frame(k, s) {
+          const f = k.shape?.(clamp(s, k.a, k.b));
+          return { x: f?.x ?? k.x, y: f?.y ?? k.y, angle: f?.angle || 0 };
+        }
+        function surfacePoint(k, s, u = 0) {
+          const f = frame(k, s);
+          return [f.x + u * Math.cos(f.angle), f.y + u * Math.sin(f.angle), -s];
+        }
+        function contactFrame(k, p) {
+          const s = -p.z,
+            f = frame(k, s),
+            sin = Math.sin(f.angle),
+            cos = Math.cos(f.angle),
+            dx = p.x - f.x,
+            dy = p.y - f.y;
+          const u = cos * dx + sin * dy;
+          const a = surfacePoint(k, s - 0.035, u),
+            b = surfacePoint(k, s + 0.035, u);
+          const span = clamp(s + 0.035, k.a, k.b) - clamp(s - 0.035, k.a, k.b);
+          const nz =
+            span > 0.0001
+              ? (-sin * (b[0] - a[0]) + cos * (b[1] - a[1])) / span
+              : 0;
+          const scale = Math.hypot(1, nz);
+          return {
+            u,
+            dist: (cos * dy - sin * dx) / scale,
+            nx: -sin / scale,
+            ny: cos / scale,
+            nz: nz / scale,
+            angle: f.angle,
+          };
+        }
+        function ribbon(k, from, to, material, offset = 0) {
+          const rows = Math.max(1, Math.ceil((k.b - k.a) / 1.1)),
+            v = [],
+            idx = [],
+            uv = [];
+          for (let i = 0; i <= rows; i++) {
+            const s = k.a + ((k.b - k.a) * i) / rows;
+            for (const u of [from, to]) {
+              const pt = surfacePoint(k, s, u);
+              pt[1] += offset;
+              v.push(...pt);
+              uv.push((u + k.w / 2) / 3, s / 4);
+            }
+            if (i) {
+              const n = 2 * i;
+              idx.push(n - 2, n - 1, n, n - 1, n + 1, n);
+            }
+          }
+          const geo = new T.BufferGeometry();
+          geo.setAttribute("position", new T.Float32BufferAttribute(v, 3));
+          geo.setAttribute("uv", new T.Float32BufferAttribute(uv, 2));
+          geo.setIndex(idx);
+          geo.computeVertexNormals();
+          courseAssets.push(geo);
+          const m = new T.Mesh(geo, material);
+          m.receiveShadow = true;
+          k.group.add(m);
+          return { v, idx, mesh: m };
+        }
+        function labelPost(k, s, caption) {
+          const [x, y, z] = surfacePoint(k, s, -k.w / 2 - 0.95);
+          box(courseGroup, x, y + 0.9, z, 0.12, 1.8, 0.15, charcoal);
+          panel(
+            courseGroup,
+            x,
+            y + 1.65,
+            s - 0.1,
+            3.1,
+            0.65,
+            printMat(caption, "#e9d6b5", "#343a33"),
+          );
+        }
+        function makeRibbon(k) {
+          const group = new T.Group();
+          courseGroup.add(group);
+          k.group = group;
+          const glass = k.type === "glass",
+            mag = k.type === "magnet";
+          const skin = glass ? glassSkin.clone() : mag ? railSkin : roadMat;
+          if (glass) {
+            k.glass = skin;
+            courseAssets.push(skin);
+          }
+          const { v, idx } = ribbon(k, -k.w / 2, k.w / 2, skin);
+          const body = new C.Body({ mass: 0, material: groundPhys });
+          if (k.shape) {
+            body.addShape(new C.Trimesh(v, idx));
+            k.ribbonCollider = true;
+          } else {
+            body.addShape(
+              new C.Box(new C.Vec3(k.w / 2, 0.32, (k.b - k.a) / 2)),
+            );
+            body.position.set(k.x, k.y - 0.32, -(k.a + k.b) / 2);
+          }
+          k.body = body;
+          colliders.push(body);
+          world.addBody(body);
+          for (const side of [-1, 1]) {
+            const end = side * (k.w / 2 - 0.05);
+            ribbon(
+              k,
+              end - 0.065,
+              end + 0.065,
+              mag ? signalBlue : glass ? turq : amber,
+              0.025,
+            );
+          }
+          if (!glass) {
+            ribbon(k, -k.w / 2, k.w / 2, charcoal, -0.22);
+            for (let s = k.a + 3; s < k.b; s += 9) {
+              const f = frame(k, s),
+                top = f.y - 0.29 - 0.32 * Math.abs(Math.sin(f.angle));
+              box(
+                courseGroup,
+                f.x,
+                (top - 14) / 2,
+                -s,
+                0.52,
+                top + 14,
+                0.65,
+                pillar,
+              );
+            }
+          }
+          const captions = {
+            glass: "GL  /  < 0.50 s",
+            magnet: "EM  /  Fe 75°",
+            laser: "IR  /  HEAT",
+            bend: "S  /  SLOW",
+            high: "H  /  SAMPLE",
+            low: "L  /  BYPASS",
+            beam: "BALANCE",
+            crest: "PULSE",
+            fork: "H  <    >  L",
+          };
+          if (captions[k.type]) labelPost(k, k.a + 1, captions[k.type]);
+          if (k.type === "landing")
+            gantry(finish, k.y, k.w, "FINISH  /  0" + (level + 1));
+          if (k.type === "laser")
+            for (const ratio of [0.29, 0.69]) {
+              const s = k.a + (k.b - k.a) * ratio,
+                g = new T.Group();
+              courseGroup.add(g);
+              const span = k.w + 2.7;
+              for (let side of [-1, 1]) {
+                box(g, (side * span) / 2, 1.35, 0, 0.28, 2.7, 0.38, charcoal);
+                box(g, (side * span) / 2, 2.68, 0, 0.36, 0.15, 0.46, laserCore);
+              }
+              for (const h of [0.63, 1.65, 2.65]) {
+                box(g, 0, h, 0, span, 0.065, 0.065, laserCore);
+                box(g, 0, h, 0, span, 0.19, 0.17, laserHalo);
+              }
+              scanners.push({ k, s, g });
+            }
+        }
+        function makeStations() {
+          for (const s of stationMarks) {
+            const k = sections.find((k) => s >= k.a && s < k.b),
+              f = frame(k, s);
+            const lights = [];
+            checkpoints.push({ s, x: f.x, y: f.y, lights });
+            for (const side of [-1, 1]) {
+              const x = f.x + side * (k.w / 2 + 0.13);
+              box(courseGroup, x, f.y + 1.7, -s, 0.29, 3.4, 0.45, charcoal);
+              box(courseGroup, x, f.y + 2.75, -s, 0.37, 1.1, 0.49, beaconLight);
+              const glow = new T.Sprite(beaconGlow);
+              glow.position.set(x, f.y + 2.75, -s);
+              courseGroup.add(glow);
+              lights.push(glow);
+            }
+            box(
+              courseGroup,
+              f.x,
+              f.y + 0.035,
+              -s,
+              k.w,
+              0.045,
+              0.17,
+              beaconLight,
+            );
+            panel(
+              courseGroup,
+              f.x,
+              f.y + 0.04,
+              s - 1.5,
+              6,
+              1,
+              printMat("CP  /  " + s, null, "#e3edc1"),
+              true,
+            );
+          }
+          const lip = finish - 20;
+          for (const [s, x, y] of [
+            [
+              236,
+              -4.4,
+              frame(
+                sections.find((k) => k.type === "high"),
+                236,
+              ).y + 1.24,
+            ],
+            [268, -4.4, 6.24],
+            [lip + 1, 0, 4.1],
+          ]) {
+            const g = new T.Group();
+            g.position.set(x, y, -s);
+            courseGroup.add(g);
+            const gem = new T.Mesh(gemShape, gemMaterial);
+            gem.scale.y = 1.45;
+            g.add(gem);
+            const ring = new T.Mesh(haloShape, sampleLight);
+            ring.rotation.x = 0.9;
+            g.add(ring);
+            samples.push({ s, x, y, g, taken: false });
+          }
+        }
+        function scannerAngle(sensor, time) {
+          return Math.sin(time * 2.1 + sensor.s) * 0.31;
+        }
+        function scannerX(sensor, time) {
+          return sensor.k.x + 0.94 * Math.sin(time * 1.45 + sensor.s * 0.37);
+        }
+        function inBeam(sensor, p, time) {
+          if (Math.abs(p.z + sensor.s) > 3) return false;
+          const dx = p.x - scannerX(sensor, time),
+            dz = p.z + sensor.s,
+            angle = scannerAngle(sensor, time),
+            cos = Math.cos(angle),
+            sin = Math.sin(angle);
+          return (
+            Math.abs(dx * cos - dz * sin) <= (sensor.k.w + 2.7) / 2 + R &&
+            Math.abs(dz * cos + dx * sin) < R + 0.1 &&
+            [0.63, 1.65, 2.65].some(
+              (h) => Math.abs(p.y - sensor.k.y - h) < R + 0.09,
+            )
+          );
+        }
+        function notifyPlayer(message) {
+          feedback = message;
+          feedbackUntil = t + 1.8;
+        }
+        function clearShards() {
+          for (const s of shards) courseGroup.remove(s.m);
+          shards.length = 0;
+        }
+        const shardShape = new T.TetrahedronGeometry(0.46),
+          shardMat = new T.MeshStandardMaterial({
+            color: 0x9ed7d8,
+            transparent: true,
+            opacity: 0.72,
+            metalness: 0.3,
+            roughness: 0.18,
+          });
+        function breakGlass(k) {
+          k.broken = true;
+          k.group.visible = false;
+          k.body.collisionResponse = false;
+          logEvent("shatter", { load: k.load });
+          sound("impact");
+          notifyPlayer("玻璃已碎 · 下次换轻球");
+          for (let i = 0; i < 32; i++) {
+            const m = new T.Mesh(shardShape, shardMat);
+            m.position.set(
+              k.x + (random() - 0.5) * k.w,
+              k.y,
+              -(k.a + random() * (k.b - k.a)),
+            );
+            m.scale.set(0.6 + random() * 1.6, 0.17, 0.8 + random() * 2);
+            courseGroup.add(m);
+            shards.push({
+              m,
+              age: 0,
+              dx: (random() - 0.5) * 2,
+              vy: random() * 1.5,
+            });
+          }
+        }
+        function tickProps(dt) {
+          railSkin.uniforms.clock.value = t;
+          checkpoints.forEach((cp, i) =>
+            cp.lights.forEach((light) =>
+              light.scale.setScalar(
+                i < station ? 1.4 : 2.2 + 0.25 * Math.sin(t * 2.3),
+              ),
+            ),
+          );
+          for (const s of scanners) {
+            s.g.position.set(scannerX(s, t), s.k.y, -s.s);
+            s.g.rotation.y = scannerAngle(s, t);
+          }
+          for (const k of sections)
+            if (k.glass)
+              k.glass.uniforms.heat.value = clamp((k.load || 0) / 0.5, 0, 1);
+          for (const sample of samples) {
+            sample.g.visible = !sample.taken;
+            sample.g.rotation.y = t * 1.4;
+            sample.g.position.y =
+              sample.y + 0.12 * Math.sin(t * 2.1 + sample.s);
+          }
+          for (let i = shards.length - 1; i >= 0; i--) {
+            const s = shards[i];
+            s.age += dt;
+            s.vy -= 12 * dt;
+            s.m.position.x += s.dx * dt;
+            s.m.position.y += s.vy * dt;
+            s.m.rotation.z += dt * ((i % 3) - 1);
+            if (s.age > 2) {
+              courseGroup.remove(s.m);
+              shards.splice(i, 1);
+            }
+          }
+        }
+        function collectAndSave(k, grounded) {
+          const p = ball.position;
+          for (const sample of samples) {
+            if (
+              !sample.taken &&
+              Math.hypot(p.x - sample.x, p.y - sample.y, p.z + sample.s) < 1.2
+            ) {
+              sample.taken = true;
+              burst(0xffce70);
+              notifyPlayer("晶体样本已采集");
+              logEvent("sample", { s: sample.s });
+            }
+          }
+          for (let i = station; i < checkpoints.length; i++) {
+            const cp = checkpoints[i];
+            if (
+              k &&
+              -p.z >= cp.s &&
+              -p.z < cp.s + 4 &&
+              Math.abs(p.x - cp.x) <= k.w / 2 &&
+              (grounded || (p.y > cp.y && p.y < cp.y + 3.4))
+            ) {
+              station = i + 1;
+              notifyPlayer("科研检查点已激活 · " + cp.s + " m");
+              logEvent("checkpoint", { station });
+              burst(0xbae7bd, 16);
+            }
+          }
+        }
+        function microJump() {
+          if (
+            mode !== "run" ||
+            sinking ||
+            pulseSpent ||
+            attemptTime + 1e-8 < jumpReadyAt
+          )
+            return;
+          timerStarted = true;
+          jumpReadyAt = attemptTime + 1.2;
+          pulseSpent = true;
+          ball.applyImpulse(
+            new C.Vec3(
+              0,
+              ball.mass *
+                (Math.max(ball.velocity.y, 0) + 6.7 - ball.velocity.y),
+              0,
+            ),
+          );
+          burst(0xe7c381, 14);
+          logEvent("microjump");
+        }
+        function rating(count, seconds, retries) {
+          const par = [62, 69, 76][level];
+          return count === 3 && seconds <= par && retries === 0
+            ? "S"
+            : count >= 2 && seconds <= par * 1.6 && retries <= 2
+              ? "A"
+              : "B";
         }
 
         // Audio is synthesized after the first gesture. The filtered noise is shared.
@@ -1973,7 +2630,8 @@
           lastSurface = "",
           hudTime = -1,
           pausedResume = null;
-        let yaw = 0.22,
+        let cameraBank = 0,
+          yaw = 0.22,
           tilt = 0.34,
           zoom = 10.8,
           camFocus = new T.Vector3(),
@@ -2017,10 +2675,25 @@
             "translate(-50%,-50%)";
         }
         function reset(build = false) {
-          if (build) buildCourse();
+          if (build) {
+            timerStarted = false;
+            station = 0;
+            losses = 0;
+            attemptTime = 0;
+            events = [];
+            buildCourse();
+          } else if (mode !== "failed" && timerStarted) {
+            losses++;
+            logEvent("manualReset");
+          }
+          const cp = checkpoints[station - 1] || {
+            x: 0,
+            y: sections[0].y,
+            s: 0,
+          };
           endInput();
           choose(0, false);
-          ball.position.set(0, R + sections[0].y + 0.015, 0);
+          ball.position.set(cp.x, cp.y + R + 0.015, -cp.s);
           ball.velocity.setZero();
           ball.angularVelocity.setZero();
           ball.force.setZero();
@@ -2037,25 +2710,39 @@
           charge = false;
           cooldown = 0;
           lift = 0;
-          attemptTime = 0;
-          events = [];
-          surface = sections[0];
           air = false;
+          attached = false;
           lastSurface = "";
+          jumpReadyAt = attemptTime;
+          pulseSpent = false;
+          feedback = "";
+          feedbackUntil = 0;
           hudTime = -1;
-          fxLife.fill(0);
-          fxPos.fill(-999);
-          fxGeo.attributes.position.needsUpdate = true;
+          recovery = 0;
+          surface = floorAt(ball.position.x, cp.s);
           for (const k of sections) {
             k.body.collisionResponse = k.type !== "fluid";
             k.skimmed = false;
+            k.broken = false;
+            k.load = 0;
+            if (k.group) k.group.visible = true;
           }
+          clearShards();
+          fxLife.fill(0);
+          fxPos.fill(-999);
+          fxGeo.attributes.position.needsUpdate = true;
           $("dialog").hidden = true;
-          $("state").textContent = "试验就绪";
+          ballMesh.visible = true;
           yaw = 0.22;
           tilt = 0.34;
           zoom = 10.8;
           camFocus.copy(ball.position);
+          if (!build) {
+            notifyPlayer(
+              station ? "已返回检查点 · " + cp.s + " m" : "已返回起点",
+            );
+            logEvent("respawn", { station });
+          }
           updateVisual(0, true);
         }
         function modal(k, title, description, action, fn) {
@@ -2071,15 +2758,22 @@
           $("dialogAction").focus({ preventScroll: true });
         }
         function finishRun() {
-          logEvent("finish");
+          const count = samples.filter((item) => item.taken).length,
+            grade = rating(count, attemptTime, losses);
+          logEvent("finish", { count, grade });
           mode = "finish";
-          const last = level === LEVELS.length - 1;
+          const last = level === 2;
           modal(
             last ? "ALL TRIALS COMPLETE" : "TRIAL COMPLETE",
-            last ? "三项试验完成" : "已抵达终点",
-            LEVELS[level].name +
-              "  /  本次用时 " +
+            grade + " 级 · " + LEVELS[level].name,
+            "晶体样本  " +
+              count +
+              "/3    ｜    用时  " +
               attemptTime.toFixed(2) +
+              " s\n复位次数  " +
+              losses +
+              "    ｜    本关 S 级目标  " +
+              [62, 69, 76][level] +
               " s",
             last ? "重新挑战" : "进入下一关",
             () => {
@@ -2089,16 +2783,38 @@
           );
         }
         function fail(reason) {
+          if (mode !== "run") return;
           mode = "failed";
+          losses++;
+          recovery = 1.6;
           logEvent("fail", { reason });
-          modal("TRIAL INTERRUPTED", "试验中断", reason, "重试本关", () =>
-            reset(),
+          modal(
+            "RECOVERY",
+            reason,
+            "即将返回" +
+              (station
+                ? " " + checkpoints[station - 1].s + " m 科研检查点"
+                : "起点") +
+              "，已采集的样本保留。",
+            "立即复活",
+            () => reset(),
           );
         }
-        function floorAt(x, s) {
-          return sections.find(
-            (k) => s >= k.a && s < k.b && Math.abs(x - k.x) <= k.w * 0.5,
-          );
+        function floorAt(x, s, y = ball.position.y) {
+          const point = { x, y, z: -s };
+          let best = null,
+            score = Infinity;
+          for (const k of sections) {
+            if (s < k.a || s >= k.b || k.broken) continue;
+            const f = contactFrame(k, point);
+            if (Math.abs(f.u) > k.w / 2 + 0.03 || f.dist < -0.3) continue;
+            const distance = Math.abs(f.dist - R);
+            if (distance < score) {
+              score = distance;
+              best = k;
+            }
+          }
+          return best;
         }
         // Continuous sphere vs. box sweep. Distance to the closest point bounds the
         // next safe advance, including on corners. Resting contacts stay with Cannon.
@@ -2118,6 +2834,7 @@
             hz = 0;
           for (const k of sections) {
             if (
+              k.ribbonCollider ||
               !k.body.collisionResponse ||
               Math.max(-old.z, -p.z) < k.a - R ||
               Math.min(-old.z, -p.z) > k.b + R
@@ -2129,7 +2846,7 @@
                 y = old.y + dy * u,
                 z = old.z + dz * u;
               const nx = x - clamp(x, k.x - k.w / 2, k.x + k.w / 2),
-                ny = y - clamp(y, k.y - 1.08, k.y),
+                ny = y - clamp(y, k.y - (k.custom ? 0.64 : 1.08), k.y),
                 nz = z - clamp(z, -k.b, -k.a),
                 dist = Math.hypot(nx, ny, nz),
                 gap = dist - R;
@@ -2193,16 +2910,62 @@
           return horizontalSpeed >= threshold;
         }
         function step(dt) {
+          if (mode === "failed") {
+            recovery -= dt;
+            attemptTime += dt;
+            if (recovery <= 0) reset();
+            return;
+          }
           if (mode !== "run") return;
           t += dt;
-          attemptTime += dt;
+          if (!timerStarted && (keys.size || Math.hypot(joy.x, joy.y) > 0.04))
+            timerStarted = true;
+          if (timerStarted) attemptTime += dt;
           const p = ball.position,
             v = ball.velocity,
             s = -p.z,
             levelSpec = LEVELS[level],
             spec = MATERIALS[material];
           const k = floorAt(p.x, s),
-            near = k && p.y - R <= k.y + 0.16 && p.y >= k.y - 0.22;
+            basis = k ? contactFrame(k, p) : null,
+            near = basis && basis.dist <= R + 0.17 && basis.dist >= -0.05;
+          if (near && v.y < 1.2 && attemptTime > jumpReadyAt - 1.08)
+            pulseSpent = false;
+          const onRail =
+            k?.type === "magnet" &&
+            material === 0 &&
+            basis.dist < R + 0.62 &&
+            basis.dist >= -0.08 &&
+            Math.abs(basis.u) < k.w / 2;
+          if (onRail && !attached) logEvent("magnet");
+          attached = onRail;
+          for (const rail of sections)
+            if (rail.type === "magnet")
+              rail.body.collisionResponse = !(onRail && rail === k);
+          for (const pane of sections)
+            if (pane.glass && !pane.broken) {
+              if (
+                pane === k &&
+                near &&
+                basis.dist <= R + 0.025 &&
+                Math.abs(v.y) < 1 &&
+                material === 0
+              ) {
+                pane.load += dt;
+                if (pane.load > 0.5 + 1e-8) breakGlass(pane);
+              } else pane.load = 0;
+            }
+          if (
+            material === 2 &&
+            scanners.some((sensor) => inBeam(sensor, p, t))
+          ) {
+            ballMesh.visible = false;
+            burst(0xf37343);
+            logEvent("melt");
+            fail("硅胶球遭激光烧蚀");
+            return;
+          }
+
           let ax =
             joy.x +
             (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) -
@@ -2223,9 +2986,21 @@
               (Math.abs(ax) > 0.03 ? spec.steer * 0.19 : spec.steer * 0.11);
             const wind =
               s > 10 ? levelSpec.wind * Math.sin(s * 0.075 + t * 0.6) : 0;
-            ball.force.x +=
-              ball.mass * control * clamp(lateral, -spec.steer, spec.steer) +
-              wind;
+            if (onRail) {
+              // The normal force supplies adhesion. Across the track, the guiding field
+              // counters gravity's downhill component and damps drift around the rail.
+              const sin = Math.sin(basis.angle),
+                cos = Math.cos(basis.angle),
+                vt = v.x * cos + v.y * sin;
+              const guide = 20 * sin + (ax * 5 - vt) * 6 - basis.u * 5;
+              const pull = 65;
+              ball.force.x += ball.mass * (-pull * basis.nx + guide * cos);
+              ball.force.y += ball.mass * (-pull * basis.ny + guide * sin);
+              ball.force.z -= ball.mass * pull * basis.nz;
+            } else
+              ball.force.x +=
+                ball.mass * control * clamp(lateral, -spec.steer, spec.steer) +
+                wind;
             ball.force.z -=
               ball.mass *
               control *
@@ -2287,8 +3062,11 @@
           const occupied = near && k.type === "alloy" && !sinking;
           cooldown = Math.max(0, cooldown - dt);
           lift = Math.max(0, lift - dt * 2.45);
-          const pulse = attemptTime % 7 > 6.35;
-          if (cooldown === 0 && ((occupied && material === 0) || pulse)) {
+          const pulse = t % 7 > 6.35;
+          if (
+            (cooldown === 0 || (occupied && material === 0 && lift === 0)) &&
+            ((occupied && material === 0) || pulse)
+          ) {
             if (!charge) {
               logEvent("heat", {
                 source: occupied && material === 0 ? "steel" : "pulse",
@@ -2302,7 +3080,10 @@
               temperature = Math.max(0, temperature - dt * 0.9);
             if (temperature === 0) charge = false;
           }
-          if (temperature >= 1 && cooldown === 0) {
+          if (
+            temperature >= 1 &&
+            (cooldown === 0 || (occupied && material === 0 && lift === 0))
+          ) {
             lift = 1;
             cooldown = 1.4;
             charge = false;
@@ -2323,14 +3104,44 @@
           }
           before.copy(p);
           world.step(dt);
+          // For the powered rail, resolve the continuous surface normal instead of
+          // the internal triangle edges. Cannon integrates gravity and magnetic force.
+          if (onRail && -p.z >= k.a && -p.z < k.b) {
+            const f = contactFrame(k, p);
+            if (Math.abs(f.u) <= k.w / 2 && f.dist < R) {
+              normal.set(f.nx, f.ny, f.nz);
+              p.addScaledVector(R - f.dist, normal, p);
+              const vn = v.dot(normal);
+              if (vn < 0) v.addScaledVector(-vn, normal, v);
+              ball.aabbNeedsUpdate = true;
+              ball.angularVelocity.set((f.ny * v.z) / R, (-f.nx * v.z) / R, 0);
+            }
+          }
           if (!sinking) sweepDecks(before, dt);
           surface = floorAt(p.x, -p.z);
-          air = !surface || p.y - R > surface.y + 0.19;
+          const nextBasis = surface ? contactFrame(surface, p) : null;
+          // Keep fast descending spheres above the shared top face if discrete contacts miss a ribbon.
+          if (
+            surface?.ribbonCollider &&
+            nextBasis.dist < R - 0.025 &&
+            contactFrame(surface, before).dist >= R &&
+            v.y < 0
+          ) {
+            const f = nextBasis,
+              correction = R - f.dist;
+            normal.set(f.nx, f.ny, f.nz);
+            p.addScaledVector(correction, normal, p);
+            const vn = v.dot(normal);
+            if (vn < 0) v.addScaledVector(-(1 + spec.bounce) * vn, normal, v);
+            ball.aabbNeedsUpdate = true;
+          }
+          air = !nextBasis || nextBasis.dist > R + 0.19;
+          collectAndSave(surface, !air && !sinking);
           if (surface && !air && !sinking && lastSurface !== surface.type)
             logEvent("surface", { deck: surface.type });
           lastSurface = surface && !air ? surface.type : "";
           if (p.y < -8) {
-            fail("滚珠跌出了赛道。留意边缘刻度，在跳台中央保持向前速度。");
+            fail("滚珠跌出赛道");
             return;
           }
           if (surface === sections.at(-1) && !air && !sinking)
@@ -2344,49 +3155,43 @@
             finishRun();
         }
         function drawMap() {
-          const c = $("map"),
-            g = c.getContext("2d"),
-            w = c.width,
-            h = c.height,
-            pad = 9;
+          const canvas = $("map"),
+            g = canvas.getContext("2d"),
+            w = canvas.width,
+            h = canvas.height;
           g.clearRect(0, 0, w, h);
-          const px = (s) => pad + ((w - pad * 2) * s) / finish,
-            py = (y) => h * 0.68 - y * 4.6;
-          g.strokeStyle = "#d6cfc0";
-          g.lineWidth = 1;
-          for (let i = 0; i < 10; i++) {
-            const x = pad + (i * (w - 2 * pad)) / 9;
-            g.beginPath();
-            g.moveTo(x, 12);
-            g.lineTo(x, h - 6);
-            g.stroke();
-          }
+          const px = (s) => 8 + (w - 16) * clamp(s / finish, 0, 1),
+            py = (x) => h * 0.5 + x * 1.7;
           for (const k of sections) {
-            let a = px(Math.max(0, k.a)),
-              b = px(Math.min(finish, k.b));
-            g.lineWidth = 5;
             g.strokeStyle =
               {
+                glass: "#87b2b0",
+                magnet: "#487d9e",
+                laser: "#ae634e",
                 hydro: "#5b8f83",
-                alloy: "#a55e38",
-                fluid: "#92a9a0",
-                bounce: "#b87a58",
-              }[k.type] || "#6a6c5f";
+                high: "#a06832",
+                low: "#84927e",
+              }[k.type] || "#68695d";
+            g.lineWidth = 3;
             g.beginPath();
-            g.moveTo(a, py(k.y));
-            g.lineTo(b, py(k.y));
+            for (let i = 0; i <= 15; i++) {
+              const s = k.a + ((k.b - k.a) * i) / 15;
+              const x = px(s),
+                y = py(frame(k, s).x);
+              if (i) g.lineTo(x, y);
+              else g.moveTo(x, y);
+            }
             g.stroke();
           }
-          g.fillStyle = "#3d4036";
-          g.fillRect(px(finish) - 1, py(sections.at(-1).y) - 14, 2, 15);
-          g.fillRect(px(finish) + 1, py(sections.at(-1).y) - 14, 6, 4);
-          const x = px(clamp(-ball.position.z, 0, finish)),
-            y = py(clamp(ball.position.y - R, -2, 8)) - 5;
+          checkpoints.forEach((c, i) => {
+            g.fillStyle = i < station ? "#557861" : "#b9ad91";
+            g.fillRect(px(c.s) - 2, 6, 4, 10);
+          });
           g.beginPath();
-          g.arc(x, y, 6, 0, Math.PI * 2);
+          g.arc(px(-ball.position.z), py(ball.position.x), 6, 0, Math.PI * 2);
           g.fillStyle = "#b76536";
           g.fill();
-          g.strokeStyle = "#f9f2da";
+          g.strokeStyle = "#fff6df";
           g.lineWidth = 2;
           g.stroke();
         }
@@ -2406,28 +3211,59 @@
             (type === "fluid"
               ? " · 临界 " + LEVELS[level].threshold + " m/s"
               : "");
-          const status = sinking
-            ? "失去支撑 · 正在下沉"
-            : lift > 0.52
-              ? "合金相变 · 弹射"
-              : air
-                ? "空中飞行"
-                : type === "fluid"
-                  ? "高速硬化 · 掠过流体"
-                  : type === "alloy"
-                    ? charge
-                      ? "通电加热 · " + Math.round(temperature * 100) + "%"
-                      : "等待钢球或热脉冲"
-                    : type === "hydro"
-                      ? "低阻加速"
-                      : type === "bounce"
-                        ? "弹性碰撞"
-                        : s < 1
-                          ? "试验就绪"
-                          : "试验进行中";
+          $("samples").textContent =
+            "◇ " + samples.filter((q) => q.taken).length + "/3";
+          $("cp").textContent = "CP " + station + "/3";
+          const wait = Math.max(0, jumpReadyAt - attemptTime);
+          $("jumpStatus").textContent =
+            wait > 0.01 ? wait.toFixed(1) + "s" : pulseSpent ? "落地" : "就绪";
+          $("jump").setAttribute(
+            "aria-disabled",
+            String(mode !== "run" || sinking || pulseSpent || wait > 0.01),
+          );
+          const next = sections.find(
+            (q) => q.a > s && q.a < s + 19 && rules[q.type],
+          );
+          const instruction =
+            type === "landing"
+              ? "穿过终点 · 查看实验评级"
+              : type === "fork" && s >= 290
+                ? "双线汇合 · 前方科研检查点"
+                : rules[type] ||
+                  (next ? "前方 · " + rules[next.type] : LEVELS[level].mission);
+          $("mission").textContent = instruction;
+          const status =
+            feedback && feedbackUntil > t
+              ? feedback
+              : attached
+                ? "电磁吸附 · 钢球锁轨"
+                : surface?.glass && surface.load > 0.08
+                  ? "玻璃应力 · " + surface.load.toFixed(2) + " s"
+                  : sinking
+                    ? "失去支撑 · 正在下沉"
+                    : lift > 0.52
+                      ? "合金相变 · 弹射"
+                      : air
+                        ? "空中飞行"
+                        : type === "fluid"
+                          ? "高速硬化 · 掠过流体"
+                          : type === "alloy"
+                            ? charge
+                              ? "通电加热 · " +
+                                Math.round(temperature * 100) +
+                                "%"
+                              : "等待钢球或热脉冲"
+                            : type === "hydro"
+                              ? "低阻加速"
+                              : type === "bounce"
+                                ? "弹性碰撞"
+                                : s < 1
+                                  ? "试验就绪"
+                                  : "试验进行中";
           $("state").textContent = status;
         }
         function updateVisual(dt, snap = false) {
+          tickProps(dt);
           for (const gate of gates)
             gate.visible = -ball.position.z < gate.userData.gateS + 0.12;
           ballMesh.position.copy(ball.position);
@@ -2435,8 +3271,15 @@
           const k = surface;
           shadow.visible = !!k && !sinking && ball.position.y >= k.y;
           if (k) {
-            const h = Math.max(0, ball.position.y - k.y - R);
-            shadow.position.set(ball.position.x, k.y + 0.059, ball.position.z);
+            const cf = contactFrame(k, ball.position);
+            const h = Math.max(0, cf.dist - R);
+            shadow.visible = !k.broken && !sinking && Math.abs(cf.angle) < 0.12;
+            const deckY = frame(k, -ball.position.z).y;
+            shadow.position.set(
+              ball.position.x,
+              deckY + 0.059,
+              ball.position.z,
+            );
             shadow.scale.setScalar(1 + h * 0.1);
             shadow.material.opacity = Math.max(0.14, 0.87 - h * 0.11);
           }
@@ -2458,10 +3301,17 @@
           camFocus.lerp(camDest, factor);
           const d = zoom * (camera.aspect < 0.85 ? 1.28 : 1),
             pitch = tilt + (camera.aspect < 0.85 ? 0.07 : 0);
+          const targetBank =
+            surface?.type === "magnet"
+              ? frame(surface, -ball.position.z).angle
+              : 0;
+          cameraBank +=
+            (targetBank - cameraBank) * (snap ? 1 : 1 - Math.exp(-4 * dt));
+          const orbitYaw = yaw - 0.65 * cameraBank;
           camera.position.set(
-            camFocus.x + Math.sin(yaw) * Math.cos(pitch) * d,
+            camFocus.x + Math.sin(orbitYaw) * Math.cos(pitch) * d,
             camFocus.y + Math.sin(pitch) * d + 0.65,
-            camFocus.z + Math.cos(yaw) * Math.cos(pitch) * d,
+            camFocus.z + Math.cos(orbitYaw) * Math.cos(pitch) * d,
           );
           look.set(
             camFocus.x,
@@ -2608,8 +3458,13 @@
             if (mode === "run") keys.add(e.code);
             return;
           }
+          if (e.code === "Space" && mode === "run") {
+            e.preventDefault();
+            if (!e.repeat) microJump();
+            return;
+          }
           if (e.repeat) return;
-          if (e.code === "KeyR") {
+          if (e.code === "KeyR" && mode !== "finish") {
             reset();
             return;
           }
@@ -2641,7 +3496,10 @@
             if (mode === "run") choose(Number(b.dataset.m));
           }),
         );
-        actionButton($("reset"), () => reset());
+        actionButton($("jump"), microJump);
+        actionButton($("reset"), () => {
+          if (mode !== "finish") reset();
+        });
         $("dialogAction").onclick = () => {
           const fn = pausedResume;
           pausedResume = null;
@@ -2653,7 +3511,7 @@
           modal(
             "FIELD MANUAL",
             "操作与材料手册",
-            "WASD 或方向键移动，1 / 2 / 3 换材质，R 重试。手机用左侧摇杆移动，滑动赛道调整视角。\n\n钢球导通 NiTi 跳板，橙色表示加热，周期热脉冲也能触发弹射。碳纤球在青色涂层上起步最快。硅胶球能把落地冲击转为下一次反弹。\n\n流体比较水平速度与关卡阈值，达到阈值才提供支撑。",
+            "WASD / 方向键或摇杆移动，1–3 换球。空格或右下微跳跨缝，冷却 1.2 秒。R 返回最近的发光检查点。\n\n钢球导通合金、吸附蓝色侧壁。上玻璃前换轻球，进入红色激光区前换钢球或碳纤。流体需要保持阈值速度，硅胶能连续回弹。\n\n左侧高架有两枚样本，第三枚悬在终段高梁断缝。S 级需集齐、零复位且在目标时间内完成，A 级需至少两枚、至多两次复位且用时不超过目标的 1.6 倍。其余为 B 级。",
             "返回赛道",
             () => {
               mode = "run";
@@ -2708,7 +3566,7 @@
         function tick(now) {
           const dt = Math.min((now - lastTime) / 1000, 0.1);
           lastTime = now;
-          if (!document.hidden && mode === "run") {
+          if (!document.hidden && (mode === "run" || mode === "failed")) {
             acc += dt;
             while (acc >= DT) {
               step(DT);
@@ -2723,14 +3581,16 @@
           // A deterministic clock for automation. Inputs and course rules are identical.
           window.trialTest = {
             supportsFluid,
-            advance(n, until) {
+            advance(n, until, paint = true) {
               for (let i = 0; i < n; i++) {
                 step(DT);
-                updateVisual(DT);
+                if (paint) updateVisual(DT);
                 if (mode !== "run" || until?.(this.read())) break;
               }
-              updateHud();
-              draw();
+              if (paint) {
+                updateHud();
+                draw();
+              }
               return this.read();
             },
             read() {
@@ -2738,10 +3598,23 @@
                 level,
                 material,
                 mode,
+                finish,
+                station,
+                losses,
+                count: samples.filter((q) => q.taken).length,
+                attached,
+                bank: surface
+                  ? (frame(surface, -ball.position.z).angle * 180) / Math.PI
+                  : 0,
+                glassLoad: surface?.load || 0,
+                broken: sections.some((q) => q.broken),
+                jumpReadyAt,
+                pulseSpent,
                 s: -ball.position.z,
                 x: ball.position.x,
                 y: ball.position.y,
                 v: Math.hypot(ball.velocity.x, ball.velocity.z),
+                vx: ball.velocity.x,
                 vz: -ball.velocity.z,
                 vy: ball.velocity.y,
                 temperature,
@@ -2758,7 +3631,21 @@
                 time: attemptTime,
               };
             },
-            render: draw,
+            route() {
+              return sections.map((k) => ({
+                type: k.type,
+                a: k.a,
+                b: k.b,
+                w: k.w,
+                path: Array.from({ length: 25 }, (_, i) =>
+                  frame(k, k.a + ((k.b - k.a) * i) / 24),
+                ),
+              }));
+            },
+            render() {
+              updateVisual(0, true);
+              draw();
+            },
           };
           draw();
         } else requestAnimationFrame(tick);

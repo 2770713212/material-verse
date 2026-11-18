@@ -55,6 +55,131 @@ async function next(p) {
   await p.keyboard.up("w");
   await p.locator("#dialogAction").click();
 }
+// The driver reads track survey coordinates and sends ordinary keyboard events.
+// It never edits the ball, clock, checkpoints, samples or material properties.
+function pilot({
+  target = 10000,
+  route = "high",
+  fault = "",
+  stop = "",
+  budget = 1800,
+} = {}) {
+  const api = window.trialTest,
+    course = api.route(),
+    held = window.pilotKeys || (window.pilotKeys = new Set());
+  const send = (code, down) => {
+    if (down === held.has(code)) return;
+    window.dispatchEvent(
+      new KeyboardEvent(down ? "keydown" : "keyup", { code, bubbles: true }),
+    );
+    down ? held.add(code) : held.delete(code);
+  };
+  const tap = (code) => {
+    send(code, true);
+    send(code, false);
+  };
+  function section(s) {
+    return course.find(
+      (k) =>
+        s >= k.a &&
+        s < k.b &&
+        !(k.type === "high" && route === "low") &&
+        !(k.type === "low" && route === "high"),
+    );
+  }
+  function line(s) {
+    const k = section(s);
+    if (!k) {
+      if (s > 245 && s < 254 && route === "high") return -4.4;
+      return 0;
+    }
+    const n = Math.max(0, Math.min(23.999, ((s - k.a) / (k.b - k.a)) * 24)),
+      i = Math.floor(n),
+      f = n - i;
+    return k.path[i].x * (1 - f) + k.path[i + 1].x * f;
+  }
+  let a = api.read(),
+    maxBank = 0;
+  for (let i = 0; i < budget; i++) {
+    if (
+      a.s >= target ||
+      a.mode !== "run" ||
+      (stop === "launch" && a.events.some((e) => e.name === "launch")) ||
+      (stop === "crack" && a.glassLoad > 0.3) ||
+      (stop === "broken" && a.broken) ||
+      (stop === "rail" && a.attached && a.bank > 74.8)
+    )
+      break;
+    const s = a.s,
+      k = section(s),
+      type = k?.type,
+      prior = course.find((q) => q.type === "alloy"),
+      mag = course.find((q) => q.type === "magnet");
+    let m = 1;
+    if (s >= prior.a - 5 && s < prior.b + 2) m = 0;
+    if (
+      a.level === 2 &&
+      s > prior.a &&
+      s < 127 &&
+      a.events.some((e) => e.name === "launch")
+    )
+      m = 2;
+    if (s > mag.a - 5 && s < mag.b + 1) m = fault === "rail" ? 1 : 0;
+    if (fault === "glass" && ((s > 80 && s < 117) || type === "glass")) m = 0;
+    if (fault === "rubberGlass" && s > 83 && s < 118) m = 2;
+    if (
+      fault === "laser" &&
+      s > 300 &&
+      (type === "laser" || section(s + 3)?.type === "laser")
+    )
+      m = 2;
+    if (m !== a.material) tap("Digit" + (m + 1));
+    let pace = 19;
+    if (s > 145 && s < 299) pace = route === "low" ? 8 : 10;
+    if (type === "magnet" || type === "crest" || (s > 448 && s < a.finish - 7))
+      pace = 14;
+    if (s < prior.b + 28) pace = 30;
+    if (s > prior.b && a.level === 2 && s < 123) pace = 30;
+    let desired = line(s + Math.max(0.6, a.vz * 0.2));
+    if (s > 207 && s < 218) desired = route === "high" ? -4.4 : 4.6;
+    const lateral = (desired - a.x) * 4 - a.vx * 0.92;
+    send("KeyA", type !== "magnet" && lateral < -0.8);
+    send("KeyD", type !== "magnet" && lateral > 0.8);
+    send("KeyW", a.vz < pace + 0.2);
+    send("KeyS", a.vz > pace + 1.2);
+    if (
+      ((route === "high" && s > 247.2 && s < 249) ||
+        (s > a.finish - 22.2 && s < a.finish - 20)) &&
+      !a.pulseSpent &&
+      a.jumpReadyAt <= a.time
+    )
+      tap("Space");
+    a = api.advance(4, undefined, false);
+    maxBank = Math.max(maxBank, a.attached ? a.bank : 0);
+  }
+  for (const key of [...held]) send(key, false);
+  api.render();
+  return { ...a, maxBank };
+}
+
+async function drive(p, options) {
+  return p.evaluate(pilot, options);
+}
+async function revive(p) {
+  await p.evaluate(() => {
+    for (let i = 0; i < 230 && trialTest.read().mode === "failed"; i++)
+      trialTest.advance(1, undefined, false);
+    trialTest.render();
+  });
+  const a = await read(p);
+  assert.equal(a.mode, "run");
+  assert(Math.abs(a.s - a.station * 150) < 0.1);
+  return a;
+}
+async function reload(p) {
+  await p.reload();
+  await p.waitForFunction(() => window.trialTest);
+}
 async function desktop(browser) {
   const ctx = await browser.newContext({
       viewport: { width: 1440, height: 900 },
@@ -65,64 +190,43 @@ async function desktop(browser) {
   assert((await forward(p, 32)).x > 0.05);
   await p.keyboard.up("ArrowRight");
   await p.keyboard.press("r");
-  await p.keyboard.press("2");
-  await p.keyboard.down("w");
-  await until(p, (a) => a.s > 19);
+  await p.keyboard.press("Space");
+  await forward(p, 4);
+  assert((await read(p)).vy > 4);
+  await p.keyboard.press("Space");
+  assert.equal(
+    (await read(p)).events.filter((e) => e.name === "microjump").length,
+    1,
+  );
+  await forward(p, 146);
+  await p.keyboard.press("Space");
+  assert.equal(
+    (await read(p)).events.filter((e) => e.name === "microjump").length,
+    2,
+  );
+  await reload(p);
+  await drive(p, { target: 19 });
   await shot(p, "02-desktop-coating");
-  await p.keyboard.press("1");
-  const launch = await until(
-    p,
-    (a) => a.events.some((e) => e.name === "launch") && a.vy > 10 && a.y > 1.15,
-  );
+  await drive(p, { stop: "launch" });
+  await forward(p, 5);
   await shot(p, "03-desktop-alloy");
-  const finish = await until(p, (a) => a.mode === "finish");
-  assert(seen(finish, "land") && seen(launch, "launch").source === "steel");
-  records.desktopLaunch = seen(launch, "launch");
-  records.desktopLanding = seen(finish, "land");
-  await next(p);
-  // Enter the pool slowly using the brake and throttle, without moving the ball by script.
-  await p.keyboard.press("2");
-  await p.keyboard.down("w");
-  await until(p, (a) => a.s >= 10);
-  await p.keyboard.up("w");
-  let a = await read(p);
-  for (let i = 0; i < 230 && !a.sinking; i++) {
-    if (a.v > 8.4) await p.keyboard.down("s");
-    else await p.keyboard.up("s");
-    a = await forward(p, 8);
-    if (a.mode !== "run") break;
-  }
-  await p.keyboard.up("s");
-  assert(a.sinking, "slow entry did not sink " + JSON.stringify(a));
-  const sunk = await until(p, (a) => a.mode === "failed");
-  assert(sunk.y < 0);
-  records.desktopSink = seen(sunk, "sink");
-  await p.keyboard.press("r");
-  await p.keyboard.press("2");
-  await p.keyboard.down("w");
-  const skim = await until(p, (a) => a.s >= 34 && a.deck === "fluid");
-  assert(skim.v >= skim.threshold && !skim.sinking);
-  await shot(p, "04-desktop-fluid");
-  records.desktopSkim = seen(skim, "skim");
-  await until(p, (a) => a.s > 47);
-  await p.keyboard.press("1");
-  await until(p, (a) => a.mode === "finish");
-  await next(p);
-  await p.keyboard.press("2");
-  await p.keyboard.down("w");
-  await until(p, (a) => a.s > 44);
-  await p.keyboard.press("1");
-  await until(p, (a) => a.events.some((e) => e.name === "launch"));
-  await p.keyboard.press("3");
-  const last = await until(p, (a) => a.mode === "finish");
-  assert(
-    last.events.filter((e) => e.name === "land" && e.deck === "bounce")
-      .length >= 2,
-  );
-  records.rebounds = last.events.filter((e) => e.name === "land");
-  await next(p);
-  assert.equal((await read(p)).level, 0);
-  // A nonconductive specimen waits on NiTi. Only the timed pulse can launch it.
+  let a = await drive(p, { fault: "glass", stop: "crack" });
+  assert(a.glassLoad >= 0.3 && a.glassLoad <= 0.5 && !a.broken);
+  await shot(p, "07-glass-stress");
+  a = await drive(p, { fault: "glass", stop: "broken" });
+  assert(a.broken);
+  const crack = seen(a, "shatter");
+  assert(crack.load > 0.5 && crack.load < 0.51);
+  await forward(p, 24);
+  await shot(p, "08-glass-collapse");
+  a = await drive(p, {});
+  assert.equal(a.mode, "failed");
+  await revive(p);
+  await reload(p);
+  a = await drive(p, { fault: "rubberGlass", target: 117 });
+  assert.equal(a.material, 2);
+  assert(!a.broken && a.mode === "run");
+  await reload(p);
   await p.keyboard.press("2");
   await p.keyboard.down("w");
   await until(p, (a) => a.s >= 10);
@@ -131,30 +235,116 @@ async function desktop(browser) {
   for (let i = 0; i < 260 && a.s < 32.2; i++) {
     if (a.v > 8.4) await p.keyboard.down("s");
     else await p.keyboard.up("s");
-    a = await forward(p, 8);
+    a = await p.evaluate(() => trialTest.advance(8, undefined, false));
   }
   await p.keyboard.up("s");
-  const pulse = await until(p, (a) =>
+  const timed = await until(p, (a) =>
     a.events.some((e) => e.name === "launch"),
   );
-  assert.equal(seen(pulse, "launch").source, "pulse");
-  assert(!pulse.events.some((e) => e.name === "heat" && e.source === "steel"));
-  records.periodicLaunch = seen(pulse, "launch");
+  assert.equal(seen(timed, "launch").source, "pulse");
+  await reload(p);
+  records.high = [];
+  records.low = [];
+  for (let i = 0; i < 3; i++) {
+    if (i === 1) {
+      await drive(p, { target: 34 });
+      await shot(p, "04-desktop-fluid");
+      assert(seen(await read(p), "skim"));
+    }
+    if (i === 0) {
+      await drive(p, { target: 234 });
+      await shot(p, "09-upper-fork");
+      a = await drive(p, { stop: "rail" });
+      assert(a.attached && a.bank >= 74.9);
+      await shot(p, "10-magnetic-rail");
+      await drive(p, { target: 421 });
+      await shot(p, "11-laser-sweep");
+    }
+    a = await drive(p, {});
+    assert.equal(a.mode, "finish");
+    assert.equal(a.station, 3);
+    assert.equal(a.count, 3);
+    assert.equal(seen(a, "finish").grade, "S");
+    assert(a.events.some((e) => e.name === "surface" && e.deck === "high"));
+    assert((await p.locator("#dialogText").innerText()).includes("3/3"));
+    records.high.push({
+      length: a.finish,
+      time: a.time,
+      count: a.count,
+      grade: seen(a, "finish").grade,
+    });
+    if (i === 0) await shot(p, "12-trial-result");
+    await next(p);
+  }
+  for (let i = 0; i < 3; i++) {
+    a = await drive(p, { route: "low" });
+    assert.equal(a.mode, "finish");
+    assert.equal(a.count, 1);
+    assert.equal(seen(a, "finish").grade, "B");
+    assert(a.maxBank > 74.9);
+    assert(a.events.some((e) => e.name === "surface" && e.deck === "low"));
+    records.low.push({ length: a.finish, time: a.time, count: a.count });
+    await next(p);
+  }
+  await drive(p, { target: 304 });
+  const saved = await read(p);
+  assert.equal(saved.station, 2);
+  assert.equal(saved.count, 2);
+  a = await drive(p, { fault: "rail" });
+  assert.equal(a.mode, "failed", "non-steel should fall from the rail");
+  assert(!a.attached);
+  const first = await revive(p);
+  assert.equal(first.count, 2);
+  assert(first.time > saved.time);
+  a = await drive(p, { fault: "laser" });
+  assert.equal(a.mode, "failed");
+  assert(seen(a, "melt"));
+  const second = await revive(p);
+  assert.equal(second.station, 2);
+  assert.equal(second.count, 2);
+  a = await drive(p, {});
+  assert.equal(a.mode, "finish");
+  assert.equal(seen(a, "finish").grade, "A");
+  records.recovery = {
+    s: first.s,
+    bankFailure: seen(a, "fail").reason,
+    samples: second.count,
+    retries: a.losses,
+    grade: seen(a, "finish").grade,
+  };
+  await next(p);
+  await p.keyboard.press("2");
+  await p.keyboard.down("w");
+  await until(p, (a) => a.s >= 10);
+  await p.keyboard.up("w");
+  a = await read(p);
+  for (let i = 0; i < 230 && !a.sinking; i++) {
+    if (a.v > 8.4) await p.keyboard.down("s");
+    else await p.keyboard.up("s");
+    a = await p.evaluate(() => trialTest.advance(8, undefined, false));
+  }
+  await p.keyboard.up("s");
+  assert(a.sinking);
+  await until(p, (a) => a.mode === "failed");
+  await revive(p);
   assert.deepEqual(
     await p.evaluate(() =>
       [10.999, 11, 11.001].map((v) => trialTest.supportsFluid(v, 11)),
     ),
     [false, true, true],
   );
+  await drive(p, { target: 156 });
   await p.keyboard.press("r");
+  a = await read(p);
+  assert.equal(a.station, 1);
+  assert.equal(a.s, 150);
   await p.locator("#helpBtn").click();
   assert.equal((await read(p)).mode, "help");
   await p.keyboard.press("Escape");
-  assert.equal((await read(p)).mode, "run");
-  const q = (await read(p)).high;
+  const high = (await read(p)).high;
   await p.locator("#quality").click();
-  assert.notEqual((await read(p)).high, q);
-  await p.mouse.move(760, 430);
+  assert.notEqual((await read(p)).high, high);
+  await p.mouse.move(780, 440);
   await p.mouse.down();
   await p.mouse.move(810, 450);
   await p.mouse.up();
@@ -165,6 +355,7 @@ async function desktop(browser) {
   assert.equal(a.audio, "running");
   await ctx.close();
 }
+
 async function mobile(browser, width, height, portrait) {
   const ctx = await browser.newContext({
       viewport: { width, height },
@@ -187,7 +378,16 @@ async function mobile(browser, width, height, portrait) {
   };
   const stop = () => send("touchEnd");
   const rects = await p.evaluate(() => {
-    const sels = [".stage", ".course", "#pad", ".choices", "#reset", "header"];
+    const sels = [
+      ".stage",
+      ".course",
+      "#pad",
+      ".choices",
+      "#reset",
+      "#jump",
+      ".scene-tag",
+      "header",
+    ];
     return sels.map((s) => {
       const b = document.querySelector(s).getBoundingClientRect();
       return [s, b.left, b.top, b.right, b.bottom];
@@ -233,42 +433,48 @@ async function mobile(browser, width, height, portrait) {
   assert.equal(a.material, 1);
   assert(a.joy.y > 0.98);
   await until(p, (a) => a.s > 14);
+  const jump = await p.locator("#jump").boundingBox();
+  assert(jump.width >= 44 && jump.height >= 44);
+  const jf = finger(4, jump.x + jump.width / 2, jump.y + jump.height / 2);
+  await send("touchStart", held, jf);
+  await send("touchEnd", jf);
+  a = await forward(p, 6);
+  assert(a.joy.y > 0.98 && a.vy > 4 && a.pulseSpent);
+  await send("touchStart", held, jf);
+  await send("touchEnd", jf);
+  assert.equal(
+    (await read(p)).events.filter((e) => e.name === "microjump").length,
+    1,
+  );
   await shot(p, portrait ? "05-mobile-portrait" : "06-mobile-landscape");
   await stop();
   assert.equal((await read(p)).joy.y, 0);
   await p.locator("#reset").tap();
   await start();
-  const finish = await until(p, (a) => a.mode === "finish");
-  assert(seen(finish, "launch") && seen(finish, "land"));
+  a = await until(p, (a) => a.broken);
+  assert(seen(a, "launch") && seen(a, "shatter"));
   await stop();
-  if (portrait) {
-    records.touchLaunch = seen(finish, "launch");
-    records.touchLanding = seen(finish, "land");
-    await p.locator("#dialogAction").tap();
-    await p.locator('[data-m="1"]').tap();
-    await start();
-    const skim = await until(p, (a) => a.s > 35);
-    assert(seen(skim, "skim"));
-    records.touchSkim = seen(skim, "skim");
-    await stop();
-    await p.locator("#reset").tap();
-    await p.locator('[data-m="1"]').tap();
-    await start();
-    await until(p, (a) => a.s >= 10);
-    a = await read(p);
-    for (let i = 0; i < 230 && !a.sinking; i++) {
-      await send("touchMove", finger(1, x, a.v > 8.4 ? y + r : y));
-      a = await forward(p, 8);
-      if (a.mode !== "run") break;
-    }
-    assert(a.sinking);
-    await stop();
-    const sunk = await until(p, (a) => a.mode === "failed");
-    assert(sunk.y < 0);
-    records.touchSink = seen(sunk, "sink");
-  }
+  await until(p, (a) => a.mode === "failed");
+  await revive(p);
+  await drive(p, { target: 352 });
+  await p.locator('[data-m="0"]').tap();
+  await start();
+  a = await until(p, (a) => a.attached && a.bank > 74.9);
+  assert.equal(a.material, 0);
+  await until(p, (a) => a.s > 402);
+  await stop();
+  assert.equal((await read(p)).mode, "run");
+  await p.locator('[data-m="2"]').tap();
+  await start();
+  a = await until(p, (a) => a.mode === "failed");
+  assert(seen(a, "melt"));
+  await stop();
+  const restored = await revive(p);
+  assert.equal(restored.s, 300);
+  assert.equal(restored.count, 2);
   await ctx.close();
 }
+
 async function realTime(browser) {
   const p = await browser.newPage({ viewport: { width: 1000, height: 700 } });
   await watch(p);
